@@ -41,6 +41,168 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Create missing directories
+        run: |
+          echo "Creating missing directories..."
+          mkdir -p app/src/main/java/com/bouteillepleine/fuckdevicepolicy
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          echo "✅ Directories created"
+
+      - name: Create missing resource files
+        run: |
+          echo "Creating missing resource files..."
+          
+          # Create strings.xml
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <resources>
+              <string name="app_name">FuckDevicePolicy</string>
+              <string name="xposed_description">Bypass device policy restrictions and limitations</string>
+          </resources>
+          EOF
+          
+          # Create themes.xml
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <resources xmlns:tools="http://schemas.android.com/tools">
+              <!-- Base application theme. -->
+              <style name="Theme.FuckDevicePolicy" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+                  <!-- Primary brand color. -->
+                  <item name="colorPrimary">@color/purple_500</item>
+                  <item name="colorPrimaryVariant">@color/purple_700</item>
+                  <item name="colorOnPrimary">@color/white</item>
+                  <!-- Secondary brand color. -->
+                  <item name="colorSecondary">@color/teal_200</item>
+                  <item name="colorSecondaryVariant">@color/teal_700</item>
+                  <item name="colorOnSecondary">@color/black</item>
+                  <!-- Status bar color. -->
+                  <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimaryVariant</item>
+                  <!-- Customize your theme here. -->
+              </style>
+          </resources>
+          EOF
+          
+          # Create colors.xml
+          cat > app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="purple_200">#FFBB86FC</color>
+              <color name="purple_500">#FF6200EE</color>
+              <color name="purple_700">#FF3700B3</color>
+              <color name="teal_200">#FF03DAC5</color>
+              <color name="teal_700">#FF018786</color>
+              <color name="black">#FF000000</color>
+              <color name="white">#FFFFFFFF</color>
+          </resources>
+          EOF
+          
+          # Create data_extraction_rules.xml
+          cat > app/src/main/res/xml/data_extraction_rules.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <data-extraction-rules>
+              <cloud-backup>
+                  <!-- TODO: Use <include> and <exclude> to control what is backed up.
+                  <include .../>
+                  <exclude .../>
+                  -->
+              </cloud-backup>
+              <!--
+              <device-transfer>
+                  <include .../>
+                  <exclude .../>
+              </device-transfer>
+              -->
+          </data-extraction-rules>
+          EOF
+          
+          # Create backup_rules.xml
+          cat > app/src/main/res/xml/backup_rules.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <full-backup-content>
+              <!-- TODO: Use <include> and <exclude> to control what is backed up.
+              <include domain="sharedpref" path="."/>
+              <exclude domain="sharedpref" path="device.xml"/>
+              -->
+          </full-backup-content>
+          EOF
+          
+          echo "✅ Resource files created"
+
+      - name: Create MainActivity
+        run: |
+          echo "Creating MainActivity..."
+          
+          cat > app/src/main/java/com/bouteillepleine/fuckdevicepolicy/MainActivity.java << 'EOF'
+          package com.bouteillepleine.fuckdevicepolicy;
+          
+          import androidx.appcompat.app.AppCompatActivity;
+          import android.os.Bundle;
+          import android.widget.TextView;
+          
+          public class MainActivity extends AppCompatActivity {
+          
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  
+                  // Create a simple text view
+                  TextView textView = new TextView(this);
+                  textView.setText("FuckDevicePolicy Xposed Module\n\nThis module is active when:\n1. LSPosed/Xposed is installed\n2. This module is enabled\n3. Device is rebooted\n\nNo additional configuration needed!");
+                  textView.setPadding(50, 50, 50, 50);
+                  textView.setTextSize(16);
+                  
+                  setContentView(textView);
+              }
+          }
+          EOF
+          
+          echo "✅ MainActivity created"
+
+      - name: Create simple launcher icons
+        run: |
+          echo "Creating launcher icons..."
+          
+          # Create a simple colored square as placeholder icon
+          # This creates a basic PNG icon for each density
+          
+          # We'll create a simple script to generate basic icons
+          cat > create_icon.py << 'EOF'
+          from PIL import Image, ImageDraw
+          import os
+          
+          def create_icon(size, path):
+              # Create a simple colored square icon
+              img = Image.new('RGBA', (size, size), (98, 0, 238, 255))  # Purple color
+              draw = ImageDraw.Draw(img)
+              
+              # Draw a simple "F" letter
+              draw.rectangle([size//4, size//4, size//2, size*3//4], fill=(255, 255, 255, 255))
+              draw.rectangle([size//4, size//4, size*3//4, size//2], fill=(255, 255, 255, 255))
+              draw.rectangle([size//4, size//2, size*5//8, size*5//8], fill=(255, 255, 255, 255))
+              
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              img.save(path)
+          
+          # Create icons for different densities
+          create_icon(48, 'app/src/main/res/mipmap-mdpi/ic_launcher.png')
+          create_icon(72, 'app/src/main/res/mipmap-hdpi/ic_launcher.png')
+          create_icon(96, 'app/src/main/res/mipmap-xhdpi/ic_launcher.png')
+          create_icon(144, 'app/src/main/res/mipmap-xxhdpi/ic_launcher.png')
+          create_icon(192, 'app/src/main/res/mipmap-xxxhdpi/ic_launcher.png')
+          
+          print("Icons created successfully!")
+          EOF
+          
+          # Install PIL and create icons
+          pip install Pillow
+          python create_icon.py
+          
+          echo "✅ Launcher icons created"
+
       - name: Fix Gradle configuration
         run: |
           echo "Fixing Gradle configuration for compatibility..."
@@ -145,15 +307,10 @@ jobs:
           
           echo "✅ Gradle configuration fixed"
 
-      - name: Fix AndroidManifest package name
+      - name: Fix AndroidManifest
         run: |
-          echo "Fixing AndroidManifest.xml package name..."
+          echo "Creating clean AndroidManifest.xml..."
           
-          # Check current AndroidManifest.xml
-          echo "Current AndroidManifest.xml:"
-          cat app/src/main/AndroidManifest.xml
-          
-          # Create a clean AndroidManifest.xml without package attribute
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -192,10 +349,7 @@ jobs:
           </manifest>
           EOF
           
-          echo "Fixed AndroidManifest.xml:"
-          cat app/src/main/AndroidManifest.xml
-          
-          echo "✅ AndroidManifest.xml fixed"
+          echo "✅ AndroidManifest.xml created"
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -319,50 +473,6 @@ jobs:
           echo "$RELEASE_BODY" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Commit version changes
-        run: |
-          VERSION_NAME="${{ github.event.inputs.version_name }}"
-          
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Add the changed files
-          git add app/build.gradle app/src/main/AndroidManifest.xml
-          
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "🚀 Manual version bump to v${VERSION_NAME}
-
-          - Version Name: ${VERSION_NAME}
-          - Version Code: ${{ github.event.inputs.version_code }}
-          - Fixed AndroidManifest.xml package name
-          - Release Type: Manual
-          - Build: GitHub Actions"
-            
-            echo "✅ Changes committed"
-          fi
-
-      - name: Create and push tag
-        run: |
-          VERSION_NAME="${{ github.event.inputs.version_name }}"
-          
-          # Create annotated tag
-          git tag -a "v${VERSION_NAME}" -m "Release v${VERSION_NAME}
-
-          ${{ github.event.inputs.release_notes }}
-          
-          Version Code: ${{ github.event.inputs.version_code }}
-          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Built by: GitHub Actions"
-          
-          # Push changes and tag
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${VERSION_NAME}"
-          
-          echo "✅ Tag v${VERSION_NAME} created and pushed"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -400,21 +510,3 @@ jobs:
           echo "🔗 Links:"
           echo "- Release: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }}"
           echo "- APK Download: https://github.com/${{ github.repository }}/releases/download/v${{ github.event.inputs.version_name }}/${{ env.APK_FILENAME }}"
-
-      - name: Failure cleanup
-        if: failure()
-        run: |
-          echo "❌ Build failed! Cleaning up..."
-          
-          # Show recent commits
-          echo "Recent commits:"
-          git log --oneline -5
-          
-          # Show build logs if available
-          echo "Checking for build logs..."
-          find . -name "*.log" -type f | head -5 | xargs tail -20 2>/dev/null || true
-          
-          # Show Gradle daemon status
-          ./gradlew --status || true
-          
-          echo "Check the logs above for error details."
