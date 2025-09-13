@@ -213,10 +213,10 @@ jobs:
           else
             git commit -m "🚀 Manual version bump to v${VERSION_NAME}
 
-      - Version Name: ${VERSION_NAME}
-      - Version Code: ${{ github.event.inputs.version_code }}
-      - Release Type: Manual
-      - Build: GitHub Actions"
+          - Version Name: ${VERSION_NAME}
+          - Version Code: ${{ github.event.inputs.version_code }}
+          - Release Type: Manual
+          - Build: GitHub Actions"
 
             echo "✅ Changes committed"
           fi
