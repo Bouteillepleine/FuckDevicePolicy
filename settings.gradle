@@ -1,8 +1,8 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {
@@ -13,5 +13,6 @@ dependencyResolutionManagement {
         maven { url "https://api.xposed.info/" }
     }
 }
+
 rootProject.name = "FuckDevicePolicy"
 include ':app'
