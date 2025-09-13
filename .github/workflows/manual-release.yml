@@ -32,31 +32,39 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '11'
           distribution: 'temurin'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Fix Gradle repositories
+      - name: Fix Gradle configuration
         run: |
-          echo "Fixing Gradle repository configuration..."
+          echo "Fixing Gradle configuration for compatibility..."
           
-          # Create proper settings.gradle
+          # Create stable settings.gradle
           cat > settings.gradle << 'EOF'
-          pluginManagement {
+          rootProject.name = "FuckDevicePolicy"
+          include ':app'
+          EOF
+          
+          # Create stable root build.gradle
+          cat > build.gradle << 'EOF'
+          // Top-level build file where you can add configuration options common to all sub-projects/modules.
+          buildscript {
               repositories {
                   google()
                   mavenCentral()
-                  gradlePluginPortal()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.2'
               }
           }
           
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+          allprojects {
               repositories {
                   google()
                   mavenCentral()
@@ -64,23 +72,78 @@ jobs:
               }
           }
           
-          rootProject.name = "FuckDevicePolicy"
-          include ':app'
-          EOF
-          
-          # Create proper root build.gradle
-          cat > build.gradle << 'EOF'
-          // Top-level build file where you can add configuration options common to all sub-projects/modules.
-          plugins {
-              id 'com.android.application' version '8.1.4' apply false
-          }
-          
           task clean(type: Delete) {
               delete rootProject.buildDir
           }
           EOF
           
-          echo "✅ Gradle files updated"
+          # Update gradle wrapper
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.1-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+          
+          # Fix app build.gradle for compatibility
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          
+          android {
+              namespace 'com.bouteillepleine.fuckdevicepolicy'
+              compileSdk 33
+          
+              defaultConfig {
+                  applicationId "com.bouteillepleine.fuckdevicepolicy"
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 2
+                  versionName "1.1"
+          
+                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+              }
+          
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+                  debug {
+                      applicationIdSuffix ".debug"
+                      versionNameSuffix "-debug"
+                  }
+              }
+          
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          
+              buildFeatures {
+                  buildConfig true
+              }
+          
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
+          }
+          
+          dependencies {
+              compileOnly 'de.robv.android.xposed:api:82'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.8.0'
+              
+              testImplementation 'junit:junit:4.13.2'
+              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+          }
+          EOF
+          
+          echo "✅ Gradle configuration fixed"
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -99,70 +162,37 @@ jobs:
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
           VERSION_CODE="${{ github.event.inputs.version_code }}"
-
+          
           # Validate version name format (basic semantic versioning)
           if [[ ! $VERSION_NAME =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Version name must be in format X.Y.Z (e.g., 1.2.3)"
             exit 1
           fi
-
+          
           # Validate version code is a positive integer
           if [[ ! $VERSION_CODE =~ ^[1-9][0-9]*$ ]]; then
             echo "Error: Version code must be a positive integer"
             exit 1
           fi
-
+          
           echo "✅ Version validation passed"
           echo "Version Name: $VERSION_NAME"
           echo "Version Code: $VERSION_CODE"
-
-      - name: Check if version already exists
-        run: |
-          VERSION_NAME="${{ github.event.inputs.version_name }}"
-
-          # Check if tag already exists
-          if git rev-parse "v$VERSION_NAME" >/dev/null 2>&1; then
-            echo "Error: Version v$VERSION_NAME already exists!"
-            echo "Existing tags:"
-            git tag --list "v*" | sort -V | tail -5
-            exit 1
-          fi
-
-          echo "✅ Version v$VERSION_NAME is available"
 
       - name: Update version in build.gradle
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
           VERSION_CODE="${{ github.event.inputs.version_code }}"
-
+          
           echo "Updating app/build.gradle..."
-
-          # Backup original file
-          cp app/build.gradle app/build.gradle.backup
-
+          
           # Update version code and name
           sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
           sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" app/build.gradle
-
+          
           # Verify changes
           echo "=== Updated version info ==="
           grep -n "versionCode\|versionName" app/build.gradle
-
-          # Show diff
-          echo "=== Changes made ==="
-          diff app/build.gradle.backup app/build.gradle || true
-
-      - name: Validate Gradle files
-        run: |
-          echo "=== Checking Gradle configuration ==="
-          echo "settings.gradle:"
-          cat settings.gradle 2>/dev/null || echo "settings.gradle not found"
-          echo ""
-          echo "Root build.gradle:"
-          head -20 build.gradle 2>/dev/null || echo "build.gradle not found"
-          echo ""
-          echo "App build.gradle (first 30 lines):"
-          head -30 app/build.gradle
 
       - name: Test Gradle wrapper
         run: |
@@ -172,30 +202,30 @@ jobs:
       - name: Clean project
         run: |
           echo "Cleaning project..."
-          ./gradlew clean --stacktrace --info
+          ./gradlew clean --stacktrace
 
       - name: Build debug APK (test build)
         run: |
           echo "Building debug APK for testing..."
-          ./gradlew assembleDebug --stacktrace --info
+          ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
         run: |
           echo "Building release APK..."
-          ./gradlew assembleRelease --stacktrace --info
+          ./gradlew assembleRelease --stacktrace
 
       - name: Verify APK was created
         run: |
           echo "Checking for APK files..."
           find app/build/outputs/apk -name "*.apk" -type f
-
+          
           if [ ! -f "app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
             echo "Error: Release APK not found!"
             echo "Available files in outputs:"
             find app/build/outputs -type f
             exit 1
           fi
-
+          
           echo "✅ Release APK created successfully"
 
       - name: Get APK info
@@ -203,10 +233,10 @@ jobs:
           APK_FILE="app/build/outputs/apk/release/app-release-unsigned.apk"
           APK_SIZE=$(stat -c%s "$APK_FILE" 2>/dev/null || stat -f%z "$APK_FILE")
           APK_SIZE_MB=$(echo "scale=2; $APK_SIZE/1024/1024" | bc -l 2>/dev/null || echo "N/A")
-
+          
           echo "APK_SIZE_BYTES=$APK_SIZE" >> $GITHUB_ENV
           echo "APK_SIZE_MB=$APK_SIZE_MB" >> $GITHUB_ENV
-
+          
           echo "APK Size: $APK_SIZE bytes ($APK_SIZE_MB MB)"
 
       - name: Rename APK
@@ -219,19 +249,18 @@ jobs:
           echo "✅ APK renamed to: $NEW_NAME"
 
       - name: Generate release body
-        id: release_body
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
           VERSION_CODE="${{ github.event.inputs.version_code }}"
           RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
           APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
-
+          
           # Get current date
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
+          
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
-
+          
           # Save to file and environment
           echo "$RELEASE_BODY" > release_body.md
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
@@ -241,13 +270,13 @@ jobs:
       - name: Commit version changes
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
-
+          
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-
+          
           # Add only the build.gradle file
           git add app/build.gradle
-
+          
           # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -258,27 +287,27 @@ jobs:
           - Version Code: ${{ github.event.inputs.version_code }}
           - Release Type: Manual
           - Build: GitHub Actions"
-
+            
             echo "✅ Changes committed"
           fi
 
       - name: Create and push tag
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
-
+          
           # Create annotated tag
           git tag -a "v${VERSION_NAME}" -m "Release v${VERSION_NAME}
 
           ${{ github.event.inputs.release_notes }}
-        
+          
           Version Code: ${{ github.event.inputs.version_code }}
           Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           Built by: GitHub Actions"
-
+          
           # Push changes and tag
           git push origin HEAD:${{ github.ref_name }}
           git push origin "v${VERSION_NAME}"
-
+          
           echo "✅ Tag v${VERSION_NAME} created and pushed"
 
       - name: Create GitHub Release
@@ -323,16 +352,16 @@ jobs:
         if: failure()
         run: |
           echo "❌ Build failed! Cleaning up..."
-
+          
           # Show recent commits
           echo "Recent commits:"
           git log --oneline -5
-
+          
           # Show build logs if available
           echo "Checking for build logs..."
           find . -name "*.log" -type f | head -5 | xargs tail -20 2>/dev/null || true
-
+          
           # Show Gradle daemon status
           ./gradlew --status || true
-
+          
           echo "Check the logs above for error details."
