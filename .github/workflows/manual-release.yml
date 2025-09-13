@@ -52,6 +52,7 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xhdpi
           mkdir -p app/src/main/res/mipmap-xxhdpi
           mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/res/drawable
           echo "✅ Directories created"
 
       - name: Create missing resource files
@@ -164,42 +165,33 @@ jobs:
 
       - name: Create simple launcher icons
         run: |
-          echo "Creating launcher icons..."
+          echo "Creating launcher icons using ImageMagick..."
           
-          # Create a simple colored square as placeholder icon
-          # This creates a basic PNG icon for each density
+          # Install ImageMagick for image creation
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
           
-          # We'll create a simple script to generate basic icons
-          cat > create_icon.py << 'EOF'
-          from PIL import Image, ImageDraw
-          import os
-          
-          def create_icon(size, path):
-              # Create a simple colored square icon
-              img = Image.new('RGBA', (size, size), (98, 0, 238, 255))  # Purple color
-              draw = ImageDraw.Draw(img)
+          # Function to create icon
+          create_icon() {
+              local size=$1
+              local output=$2
               
-              # Draw a simple "F" letter
-              draw.rectangle([size//4, size//4, size//2, size*3//4], fill=(255, 255, 255, 255))
-              draw.rectangle([size//4, size//4, size*3//4, size//2], fill=(255, 255, 255, 255))
-              draw.rectangle([size//4, size//2, size*5//8, size*5//8], fill=(255, 255, 255, 255))
-              
-              os.makedirs(os.path.dirname(path), exist_ok=True)
-              img.save(path)
+              # Create a purple square with white "F" letter
+              convert -size ${size}x${size} xc:"#6200EE" \
+                      -gravity center \
+                      -pointsize $((size/2)) \
+                      -fill white \
+                      -font DejaVu-Sans-Bold \
+                      -annotate +0+0 "F" \
+                      "$output"
+          }
           
           # Create icons for different densities
-          create_icon(48, 'app/src/main/res/mipmap-mdpi/ic_launcher.png')
-          create_icon(72, 'app/src/main/res/mipmap-hdpi/ic_launcher.png')
-          create_icon(96, 'app/src/main/res/mipmap-xhdpi/ic_launcher.png')
-          create_icon(144, 'app/src/main/res/mipmap-xxhdpi/ic_launcher.png')
-          create_icon(192, 'app/src/main/res/mipmap-xxxhdpi/ic_launcher.png')
-          
-          print("Icons created successfully!")
-          EOF
-          
-          # Install PIL and create icons
-          pip install Pillow
-          python create_icon.py
+          create_icon 48 "app/src/main/res/mipmap-mdpi/ic_launcher.png"
+          create_icon 72 "app/src/main/res/mipmap-hdpi/ic_launcher.png"
+          create_icon 96 "app/src/main/res/mipmap-xhdpi/ic_launcher.png"
+          create_icon 144 "app/src/main/res/mipmap-xxhdpi/ic_launcher.png"
+          create_icon 192 "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
           
           echo "✅ Launcher icons created"
 
@@ -466,7 +458,7 @@ jobs:
           
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
-          
+
           # Save to file and environment
           echo "$RELEASE_BODY" > release_body.md
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
