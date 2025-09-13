@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.strawing.fuckdevicepolicy" >
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -8,13 +8,13 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true" >
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FuckDevicePolicy"
+        tools:targetApi="31">
         <activity
-            android:name="com.strawing.fuckdevicepolicy.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.FuckDevicePolicy.NoActionBar">
+            android:theme="@style/Theme.FuckDevicePolicy">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -26,14 +26,10 @@
             android:value="true" />
         <meta-data
             android:name="xposeddescription"
-            android:value="Make user restriction policy(e.g work profile policies) nonfunctional. Activate this module and reboot firstly before edit the policies in the module App!" />
+            android:value="@string/xposed_description" />
         <meta-data
             android:name="xposedminversion"
-            android:value="53" />
-        <meta-data
-            android:name="xposedscope"
-            android:resource="@array/xposed_scope" />
-        <meta-data android:name="xposedsharedprefs" android:value="true" />
+            android:value="54" />
     </application>
 
 </manifest>
