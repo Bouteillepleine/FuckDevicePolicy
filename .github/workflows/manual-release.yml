@@ -6,9 +6,11 @@ on:
       version_name:
         description: 'Version name (e.g., 1.2.3)'
         required: true
+        default: '1.0.0'
       version_code:
         description: 'Version code (integer)'
         required: true
+        default: '1'
       release_notes:
         description: 'Release notes'
         required: true
@@ -28,6 +30,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
         
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -51,59 +54,293 @@ jobs:
     - name: Make gradlew executable
       run: chmod +x gradlew
       
+    - name: Validate inputs
+      run: |
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        VERSION_CODE="${{ github.event.inputs.version_code }}"
+        
+        # Validate version name format (basic semantic versioning)
+        if [[ ! $VERSION_NAME =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Version name must be in format X.Y.Z (e.g., 1.2.3)"
+          exit 1
+        fi
+        
+        # Validate version code is a positive integer
+        if [[ ! $VERSION_CODE =~ ^[1-9][0-9]*$ ]]; then
+          echo "Error: Version code must be a positive integer"
+          exit 1
+        fi
+        
+        echo "✅ Version validation passed"
+        echo "Version Name: $VERSION_NAME"
+        echo "Version Code: $VERSION_CODE"
+        
+    - name: Check if version already exists
+      run: |
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        
+        # Check if tag already exists
+        if git rev-parse "v$VERSION_NAME" >/dev/null 2>&1; then
+          echo "Error: Version v$VERSION_NAME already exists!"
+          echo "Existing tags:"
+          git tag --list "v*" | sort -V | tail -5
+          exit 1
+        fi
+        
+        echo "✅ Version v$VERSION_NAME is available"
+        
     - name: Update version in build.gradle
       run: |
-        sed -i "s/versionCode [0-9]*/versionCode ${{ github.event.inputs.version_code }}/" app/build.gradle
-        sed -i "s/versionName \".*\"/versionName \"${{ github.event.inputs.version_name }}\"/" app/build.gradle
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        VERSION_CODE="${{ github.event.inputs.version_code }}"
+        
+        echo "Updating app/build.gradle..."
+        
+        # Backup original file
+        cp app/build.gradle app/build.gradle.backup
+        
+        # Update version code and name
+        sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
+        sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" app/build.gradle
+        
+        # Verify changes
+        echo "=== Updated version info ==="
+        grep -n "versionCode\|versionName" app/build.gradle
+        
+        # Show diff
+        echo "=== Changes made ==="
+        diff app/build.gradle.backup app/build.gradle || true
+        
+    - name: Validate Gradle files
+      run: |
+        echo "=== Checking Gradle configuration ==="
+        echo "settings.gradle:"
+        cat settings.gradle 2>/dev/null || echo "settings.gradle not found"
+        echo ""
+        echo "Root build.gradle:"
+        head -20 build.gradle 2>/dev/null || echo "build.gradle not found"
+        echo ""
+        echo "App build.gradle (first 30 lines):"
+        head -30 app/build.gradle
+        
+    - name: Test Gradle wrapper
+      run: |
+        echo "Testing Gradle wrapper..."
+        ./gradlew --version
+        
+    - name: Clean project
+      run: |
+        echo "Cleaning project..."
+        ./gradlew clean --stacktrace --info
+        
+    - name: Build debug APK (test build)
+      run: |
+        echo "Building debug APK for testing..."
+        ./gradlew assembleDebug --stacktrace --info
         
     - name: Build release APK
       run: |
-        ./gradlew clean
-        ./gradlew assembleRelease --stacktrace
+        echo "Building release APK..."
+        ./gradlew assembleRelease --stacktrace --info
+        
+    - name: Verify APK was created
+      run: |
+        echo "Checking for APK files..."
+        find app/build/outputs/apk -name "*.apk" -type f
+        
+        if [ ! -f "app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+          echo "Error: Release APK not found!"
+          echo "Available files in outputs:"
+          find app/build/outputs -type f
+          exit 1
+        fi
+        
+        echo "✅ Release APK created successfully"
+        
+    - name: Get APK info
+      run: |
+        APK_FILE="app/build/outputs/apk/release/app-release-unsigned.apk"
+        APK_SIZE=$(stat -c%s "$APK_FILE" 2>/dev/null || stat -f%z "$APK_FILE")
+        APK_SIZE_MB=$(echo "scale=2; $APK_SIZE/1024/1024" | bc -l 2>/dev/null || echo "N/A")
+        
+        echo "APK_SIZE_BYTES=$APK_SIZE" >> $GITHUB_ENV
+        echo "APK_SIZE_MB=$APK_SIZE_MB" >> $GITHUB_ENV
+        
+        echo "APK Size: $APK_SIZE bytes ($APK_SIZE_MB MB)"
         
     - name: Rename APK
       run: |
         cd app/build/outputs/apk/release
         APK_FILE=$(ls *.apk | head -n1)
-        mv "$APK_FILE" "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+        NEW_NAME="FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+        mv "$APK_FILE" "$NEW_NAME"
+        echo "APK_FILENAME=$NEW_NAME" >> $GITHUB_ENV
+        echo "✅ APK renamed to: $NEW_NAME"
+        
+    - name: Generate release body
+      id: release_body
+      run: |
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        VERSION_CODE="${{ github.event.inputs.version_code }}"
+        RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+        APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
+        
+        # Get current date
+        BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        # Create release body
+        RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
+
+### 📝 Release Notes
+${RELEASE_NOTES}
+
+### 📦 Download
+- **APK Size:** ${APK_SIZE_MB} MB
+- **Version Code:** ${VERSION_CODE}
+- **Build Date:** ${BUILD_DATE}
+
+### 📱 Installation Instructions
+1. **Download** the APK file below
+2. **Enable** \"Unknown Sources\" in your device settings
+3. **Install** the APK on your device
+4. **Activate** the module in LSPosed/Xposed Framework
+5. **Reboot** your device
+6. **Enjoy** bypassing device policy restrictions! 🎉
+
+### ⚙️ Requirements
+- 📱 Android 5.0+ (API 21+)
+- 🔧 LSPosed or Xposed Framework
+- 🔑 Root access
+
+### ✅ Compatibility
+- ✅ Android 5.0 - 14
+- ✅ LSPosed (Recommended)
+- ✅ Original Xposed Framework
+- ✅ EdXposed
+
+### 🔧 Technical Details
+- **Target SDK:** 34
+- **Min SDK:** 21  
+- **Build Type:** Release
+- **Signing:** Debug (unsigned)
+
+### 🐛 Issues?
+If you encounter any problems:
+1. Check LSPosed/Xposed logs
+2. Ensure the module is activated
+3. Try rebooting your device
+4. Report issues on GitHub
+
+### 💡 What This Module Does
+- Bypasses device policy restrictions
+- Removes admin-imposed limitations
+- Allows installation of apps blocked by device policies
+- Disables corporate device management restrictions
+
+---
+**⚠️ Disclaimer:** Use responsibly and in accordance with your organization's policies."
+
+        # Save to file and environment
+        echo "$RELEASE_BODY" > release_body.md
+        echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+        echo "$RELEASE_BODY" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
         
     - name: Commit version changes
       run: |
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add app/build.gradle
-        git commit -m "Manual version bump to v${{ github.event.inputs.version_name }}" || exit 0
-        git push origin HEAD:${{ github.ref_name }}
         
-    - name: Create Release
+        # Add only the build.gradle file
+        git add app/build.gradle
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🚀 Manual version bump to v${VERSION_NAME}
+
+- Version Name: ${VERSION_NAME}
+- Version Code: ${{ github.event.inputs.version_code }}
+- Release Type: Manual
+- Build: GitHub Actions"
+          
+          echo "✅ Changes committed"
+        fi
+        
+    - name: Create and push tag
+      run: |
+        VERSION_NAME="${{ github.event.inputs.version_name }}"
+        
+        # Create annotated tag
+        git tag -a "v${VERSION_NAME}" -m "Release v${VERSION_NAME}
+
+${{ github.event.inputs.release_notes }}
+
+Version Code: ${{ github.event.inputs.version_code }}
+Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Built by: GitHub Actions"
+        
+        # Push changes and tag
+        git push origin HEAD:${{ github.ref_name }}
+        git push origin "v${VERSION_NAME}"
+        
+        echo "✅ Tag v${VERSION_NAME} created and pushed"
+        
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: "v${{ github.event.inputs.version_name }}"
-        name: "FuckDevicePolicy v${{ github.event.inputs.version_name }}"
-        body: |
-          ## FuckDevicePolicy v${{ github.event.inputs.version_name }}
-          
-          ### Release Notes
-          ${{ github.event.inputs.release_notes }}
-          
-          ### Installation Instructions
-          1. Download the APK file below
-          2. Install the APK on your device
-          3. Activate the module in LSPosed/Xposed Framework
-          4. Reboot your device
-          
-          ### Requirements
-          - Android 5.0+ (API 21+)
-          - LSPosed or Xposed Framework
-          - Root access
-          
-          ### Technical Details
-          - Version Code: ${{ github.event.inputs.version_code }}
-          - Target SDK: 34
-          - Min SDK: 21
-          - Build Type: Release
-        files: app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
+        name: "🚀 FuckDevicePolicy v${{ github.event.inputs.version_name }}"
+        body: ${{ env.RELEASE_BODY }}
+        files: app/build/outputs/apk/release/${{ env.APK_FILENAME }}
         draft: false
         prerelease: ${{ github.event.inputs.prerelease }}
+        make_latest: ${{ !github.event.inputs.prerelease }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: "FuckDevicePolicy-v${{ github.event.inputs.version_name }}-artifacts"
+        path: |
+          app/build/outputs/apk/release/${{ env.APK_FILENAME }}
+          release_body.md
+          app/build.gradle
+        retention-days: 30
+        
+    - name: Success summary
+      run: |
+        echo "🎉 Manual release completed successfully!"
+        echo ""
+        echo "📄 Release Details:"
+        echo "- Version: v${{ github.event.inputs.version_name }}"
+        echo "- Version Code: ${{ github.event.inputs.version_code }}"
+        echo "- APK: ${{ env.APK_FILENAME }}"
+        echo "- Size: ${{ env.APK_SIZE_MB }} MB"
+        echo "- Pre-release: ${{ github.event.inputs.prerelease }}"
+        echo ""
+        echo "🔗 Links:"
+        echo "- Release: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }}"
+        echo "- APK Download: https://github.com/${{ github.repository }}/releases/download/v${{ github.event.inputs.version_name }}/${{ env.APK_FILENAME }}"
+        
+    - name: Failure cleanup
+      if: failure()
+      run: |
+        echo "❌ Build failed! Cleaning up..."
+        
+        # Show recent commits
+        echo "Recent commits:"
+        git log --oneline -5
+        
+        # Show build logs if available
+        echo "Checking for build logs..."
+        find . -name "*.log" -type f | head -5 | xargs tail -20 2>/dev/null || true
+        
+        # Show Gradle daemon status
+        ./gradlew --status || true
+        
+        echo "Check the logs above for error details."
