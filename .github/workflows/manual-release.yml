@@ -199,6 +199,84 @@ jobs:
           
           echo "✅ Launcher icons created"
 
+      - name: Download Xposed API manually
+        run: |
+          echo "Downloading Xposed API manually..."
+          mkdir -p app/libs
+          
+          # Download Xposed API JAR from GitHub mirror
+          curl -L -o app/libs/xposed-api-82.jar \
+            "https://github.com/rovo89/XposedBridge/releases/download/v82/api-82.jar" || \
+          curl -L -o app/libs/xposed-api-82.jar \
+            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" || \
+          curl -L -o app/libs/xposed-api-82.jar \
+            "https://jcenter.bintray.com/de/robv/android/xposed/api/82/api-82.jar" || \
+          echo "Warning: Could not download Xposed API, will create stub"
+          
+          # If download failed, create a minimal stub
+          if [ ! -f "app/libs/xposed-api-82.jar" ]; then
+            echo "Creating Xposed API stub..."
+            mkdir -p temp_xposed/de/robv/android/xposed
+            
+            # Create minimal XposedBridge stub
+            cat > temp_xposed/de/robv/android/xposed/XposedBridge.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public class XposedBridge {
+              public static void log(String text) {}
+              public static void log(Throwable t) {}
+              public static void hookAllMethods(Class<?> hookClass, String methodName, XC_MethodHook callback) {}
+              public static void hookAllConstructors(Class<?> hookClass, XC_MethodHook callback) {}
+          }
+          EOF
+          
+            # Create XC_MethodHook stub
+            cat > temp_xposed/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public abstract class XC_MethodHook {
+              public static class MethodHookParam {
+                  public Object[] args;
+                  public Object thisObject;
+                  public void setResult(Object result) {}
+                  public Object getResult() { return null; }
+              }
+              
+              protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
+              protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
+          }
+          EOF
+          
+            # Create IXposedHookLoadPackage stub
+            cat > temp_xposed/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public interface IXposedHookLoadPackage {
+              void handleLoadPackage(LoadPackageParam lpparam) throws Throwable;
+              
+              class LoadPackageParam {
+                  public String packageName;
+                  public ClassLoader classLoader;
+              }
+          }
+          EOF
+          
+            # Compile stub classes
+            javac -d temp_xposed temp_xposed/de/robv/android/xposed/*.java
+            
+            # Create JAR
+            cd temp_xposed
+            jar cf ../app/libs/xposed-api-82.jar de/
+            cd ..
+            rm -rf temp_xposed
+            
+            echo "✅ Xposed API stub created"
+          else
+            echo "✅ Xposed API downloaded successfully"
+          fi
+          
+          ls -la app/libs/
+
       - name: Fix Gradle configuration
         run: |
           echo "Fixing Gradle configuration for compatibility..."
@@ -209,7 +287,7 @@ jobs:
           include ':app'
           EOF
           
-          # Create stable root build.gradle
+          # Create stable root build.gradle without Xposed repository
           cat > build.gradle << 'EOF'
           // Top-level build file where you can add configuration options common to all sub-projects/modules.
           buildscript {
@@ -226,7 +304,7 @@ jobs:
               repositories {
                   google()
                   mavenCentral()
-                  maven { url "https://api.xposed.info/" }
+                  // Removed problematic Xposed repository
               }
           }
           
@@ -244,7 +322,7 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
           
-          # Fix app build.gradle for JDK 17 and newer Android Gradle Plugin
+          # Fix app build.gradle to use local JAR instead of repository
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
@@ -291,7 +369,9 @@ jobs:
           }
           
           dependencies {
-              compileOnly 'de.robv.android.xposed:api:82'
+              // Use local Xposed API JAR instead of repository
+              compileOnly files('libs/xposed-api-82.jar')
+              
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.10.0'
               
@@ -462,7 +542,7 @@ jobs:
           
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
-
+          
           # Save to file and environment
           echo "$RELEASE_BODY" > release_body.md
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
