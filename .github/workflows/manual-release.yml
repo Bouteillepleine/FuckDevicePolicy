@@ -145,6 +145,58 @@ jobs:
           
           echo "✅ Gradle configuration fixed"
 
+      - name: Fix AndroidManifest package name
+        run: |
+          echo "Fixing AndroidManifest.xml package name..."
+          
+          # Check current AndroidManifest.xml
+          echo "Current AndroidManifest.xml:"
+          cat app/src/main/AndroidManifest.xml
+          
+          # Create a clean AndroidManifest.xml without package attribute
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
+          
+              <application
+                  android:allowBackup="true"
+                  android:dataExtractionRules="@xml/data_extraction_rules"
+                  android:fullBackupContent="@xml/backup_rules"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.FuckDevicePolicy"
+                  tools:targetApi="31">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:theme="@style/Theme.FuckDevicePolicy">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+          
+                  <meta-data
+                      android:name="xposedmodule"
+                      android:value="true" />
+                  <meta-data
+                      android:name="xposeddescription"
+                      android:value="@string/xposed_description" />
+                  <meta-data
+                      android:name="xposedminversion"
+                      android:value="54" />
+              </application>
+          
+          </manifest>
+          EOF
+          
+          echo "Fixed AndroidManifest.xml:"
+          cat app/src/main/AndroidManifest.xml
+          
+          echo "✅ AndroidManifest.xml fixed"
+
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -274,8 +326,8 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # Add only the build.gradle file
-          git add app/build.gradle
+          # Add the changed files
+          git add app/build.gradle app/src/main/AndroidManifest.xml
           
           # Check if there are changes to commit
           if git diff --staged --quiet; then
@@ -285,6 +337,7 @@ jobs:
 
           - Version Name: ${VERSION_NAME}
           - Version Code: ${{ github.event.inputs.version_code }}
+          - Fixed AndroidManifest.xml package name
           - Release Type: Manual
           - Build: GitHub Actions"
             
