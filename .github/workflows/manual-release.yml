@@ -191,55 +191,6 @@ jobs:
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
 
-### 📝 Release Notes
-${RELEASE_NOTES}
-
-### 📦 Download
-- **APK Size:** ${APK_SIZE_MB} MB
-- **Version Code:** ${VERSION_CODE}
-- **Build Date:** ${BUILD_DATE}
-
-### 📱 Installation Instructions
-1. **Download** the APK file below
-2. **Enable** \"Unknown Sources\" in your device settings
-3. **Install** the APK on your device
-4. **Activate** the module in LSPosed/Xposed Framework
-5. **Reboot** your device
-6. **Enjoy** bypassing device policy restrictions! 🎉
-
-### ⚙️ Requirements
-- 📱 Android 5.0+ (API 21+)
-- 🔧 LSPosed or Xposed Framework
-- 🔑 Root access
-
-### ✅ Compatibility
-- ✅ Android 5.0 - 14
-- ✅ LSPosed (Recommended)
-- ✅ Original Xposed Framework
-- ✅ EdXposed
-
-### 🔧 Technical Details
-- **Target SDK:** 34
-- **Min SDK:** 21
-- **Build Type:** Release
-- **Signing:** Debug (unsigned)
-
-### 🐛 Issues?
-If you encounter any problems:
-1. Check LSPosed/Xposed logs
-2. Ensure the module is activated
-3. Try rebooting your device
-4. Report issues on GitHub
-
-### 💡 What This Module Does
-- Bypasses device policy restrictions
-- Removes admin-imposed limitations
-- Allows installation of apps blocked by device policies
-- Disables corporate device management restrictions
-
----
-**⚠️ Disclaimer:** Use responsibly and in accordance with your organization's policies."
-
           # Save to file and environment
           echo "$RELEASE_BODY" > release_body.md
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
