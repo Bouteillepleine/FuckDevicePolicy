@@ -1,18 +1,17 @@
-name: Build and Release
+name: Build APK
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
       
     - name: Set up JDK 17
@@ -34,29 +33,35 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
           
-    - name: Grant execute permission for gradlew
+    - name: Make gradlew executable
       run: chmod +x gradlew
       
+    - name: Clean project
+      run: ./gradlew clean
+      
     - name: Build debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --stacktrace
       
     - name: Build release APK
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease --stacktrace
       
-    - name: Sign APK
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: r0adkll/sign-android-release@v1
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
+    - name: List APK files
+      run: |
+        echo "Debug APKs:"
+        find app/build/outputs/apk/debug -name "*.apk" -type f
+        echo "Release APKs:"
+        find app/build/outputs/apk/release -name "*.apk" -type f
         
-    - name: Upload build artifacts
+    - name: Upload debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: apk-builds
-        path: |
-          app/build/outputs/apk/debug/*.apk
-          app/build/outputs/apk/release/*.apk
+        name: debug-apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
+        
+    - name: Upload release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: app/build/outputs/apk/release/*.apk
+        if-no-files-found: error
