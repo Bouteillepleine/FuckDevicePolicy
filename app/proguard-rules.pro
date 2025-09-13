@@ -1,21 +1,21 @@
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Xposed framework
+-keep class de.robv.android.xposed.** { *; }
+-keep class * extends de.robv.android.xposed.IXposedHookLoadPackage
+-keep class * extends de.robv.android.xposed.IXposedHookZygoteInit
+-keep class * extends de.robv.android.xposed.IXposedHookInitPackageResources
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep module entry point
+-keep class com.bouteillepleine.fuckdevicepolicy.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Basic Android rules
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod
+
+# Don't warn about missing classes
+-dontwarn de.robv.android.xposed.**
