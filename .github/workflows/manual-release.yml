@@ -643,7 +643,7 @@ jobs:
           echo "🔧 Setting up Gradle wrapper..."
           chmod +x gradlew || echo "gradlew not found, will be downloaded by Gradle"
 
-            - name: 🎨 Create Missing Layout Files and Resources
+      - name: 🎨 Create Missing Layout Files and Resources
         run: |
           echo "🎨 Creating complete Android layout files and resources..."
           
