@@ -652,7 +652,6 @@ jobs:
           #!/bin/sh
           
           DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
-          
           APP_NAME="Gradle"
           APP_BASE_NAME=$(basename "$0")
           
@@ -672,6 +671,14 @@ jobs:
           APP_HOME="$(pwd -P)"
           cd "$SAVED" >/dev/null
           
+          # Function to die with a message
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
+          }
+          
           # Determine the Java command to use to start the JVM.
           if [ -n "$JAVA_HOME" ] ; then
               if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
@@ -682,25 +689,17 @@ jobs:
               fi
               if [ ! -x "$JAVACMD" ] ; then
                   die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-          
+
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
               fi
           else
               JAVACMD="java"
               which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-          
+
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
           fi
-          
-          # Function to die with a message
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit 1
-          }
           
           # Escape application args
           save () {
@@ -709,7 +708,7 @@ jobs:
           }
           APP_ARGS=$(save "$@")
           
-          # Collect all arguments for the java command; same as above, but using () instead of ""
+          # Collect all arguments for the java command
           eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
           
           exec "$JAVACMD" "$@"
@@ -728,6 +727,7 @@ jobs:
           }
           
           rootProject.name = 'FuckDevicePolicy'
+          include ':app'
           EOF
           
           # Update build.gradle with buildscript repositories
@@ -803,11 +803,8 @@ jobs:
           
           echo "Building with VERSION_CODE=$VERSION_CODE, VERSION_NAME=$VERSION_NAME"
           
-          # Use the wrapper to ensure we use Gradle 8.5
-          ./gradlew assembleRelease --stacktrace --info
-        env:
-          VERSION_CODE: ${{ env.VERSION_CODE }}  
-          VERSION_NAME: ${{ env.VERSION_NAME }}
+          # Use the wrapper to build the app module
+          ./gradlew :app:assembleRelease --stacktrace --info
 
       - name: Verify APK exists
         run: |
