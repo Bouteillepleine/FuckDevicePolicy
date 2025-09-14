@@ -1,13 +1,6 @@
-buildscript {
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.4'
-    }
-}
-
 allprojects {
-    // No repository declarations here; they are managed in settings.gradle
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
+    repositories {
+        google()
+        mavenCentral()
+    }
 }
