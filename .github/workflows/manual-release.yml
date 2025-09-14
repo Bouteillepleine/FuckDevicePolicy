@@ -49,30 +49,23 @@ jobs:
           mkdir -p app/src/main/assets/xposed
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
+          mkdir -p app/libs
+
+      - name: Clean and create mipmap directories
+        run: |
+          # Remove any existing mipmap directories and recreate clean ones
+          rm -rf app/src/main/res/mipmap-*
           mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/res/mipmap-mdpi  
           mkdir -p app/src/main/res/mipmap-xhdpi
           mkdir -p app/src/main/res/mipmap-xxhdpi
           mkdir -p app/src/main/res/mipmap-xxxhdpi
-          mkdir -p app/libs
-
-      - name: Remove duplicate launcher icons
-        run: |
-          # Remove PNG versions of launcher icons to avoid conflicts with WebP versions
-          find app/src/main/res -name "ic_launcher.png" -delete
-          find app/src/main/res -name "ic_launcher_round.png" -delete
-          find app/src/main/res -name "ic_launcher_foreground.png" -delete
-          find app/src/main/res -name "ic_launcher_background.png" -delete
-          
-          # List remaining launcher icons to verify
-          echo "Remaining launcher icon files:"
-          find app/src/main/res -name "ic_launcher*" | sort
+          echo "Created clean mipmap directories"
 
       - name: Create enhanced XposedHook.java
         run: |
           cat > app/src/main/java/com/fuckdevicepolicy/XposedHook.java << 'EOF'
           package com.fuckdevicepolicy;
-
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XC_MethodReplacement;
@@ -82,7 +75,6 @@ jobs:
           import android.app.admin.DevicePolicyManager;
           import android.content.ComponentName;
           import android.os.UserHandle;
-
           public class XposedHook implements IXposedHookLoadPackage {
               
               private static final String TAG = "FuckDevicePolicy";
@@ -384,14 +376,12 @@ jobs:
         run: |
           cat > app/src/main/java/com/fuckdevicepolicy/MainActivity.java << 'EOF'
           package com.fuckdevicepolicy;
-
           import android.app.Activity;
           import android.os.Bundle;
           import android.widget.TextView;
           import android.widget.LinearLayout;
           import android.view.Gravity;
           import android.graphics.Color;
-
           public class MainActivity extends Activity {
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -443,17 +433,14 @@ jobs:
               package="com.fuckdevicepolicy"
               android:versionCode="${{ github.event.inputs.version_code }}"
               android:versionName="${{ github.event.inputs.version_name }}">
-
               <uses-sdk
                   android:minSdkVersion="21"
                   android:targetSdkVersion="34" />
-
               <application
                   android:allowBackup="false"
                   android:icon="@mipmap/ic_launcher"
                   android:label="FuckDevicePolicy"
                   android:theme="@android:style/Theme.DeviceDefault">
-
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -463,7 +450,6 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-
                   <meta-data
                       android:name="xposedmodule"
                       android:value="true" />
@@ -473,7 +459,6 @@ jobs:
                   <meta-data
                       android:name="xposedminversion"
                       android:value="54" />
-
               </application>
           </manifest>
           EOF
@@ -494,11 +479,16 @@ jobs:
 
       - name: Create app icons
         run: |
+          # Create PNG launcher icons only to avoid conflicts
           convert -size 48x48 xc:"#ff6b6b" -fill "#ffffff" -pointsize 20 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-hdpi/ic_launcher.png
           convert -size 32x32 xc:"#ff6b6b" -fill "#ffffff" -pointsize 16 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-mdpi/ic_launcher.png
           convert -size 64x64 xc:"#ff6b6b" -fill "#ffffff" -pointsize 24 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xhdpi/ic_launcher.png
           convert -size 96x96 xc:"#ff6b6b" -fill "#ffffff" -pointsize 36 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           convert -size 128x128 xc:"#ff6b6b" -fill "#ffffff" -pointsize 48 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # Verify created icons
+          echo "Created launcher icons:"
+          find app/src/main/res -name "ic_launcher.png" -type f | sort
 
       - name: Create minimal Xposed API stub
         run: |
@@ -565,84 +555,17 @@ jobs:
           EOF
           
           # Compile the stub API
-          mkdir -p app/libs
+          mkdir -p temp_classes
           javac -d temp_classes temp_api/de/robv/android/xposed/*.java temp_api/de/robv/android/xposed/callbacks/*.java
           cd temp_classes && jar cf ../app/libs/api-82.jar de/
           cd ..
           
           echo "Created minimal Xposed API stub for compilation"
 
-      - name: Create build.gradle
-        run: |
-          cat > app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
-
-          android {
-              namespace 'com.fuckdevicepolicy'
-              compileSdk 34
-
-              defaultConfig {
-                  applicationId "com.fuckdevicepolicy"
-                  minSdk 21
-                  targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code }}")
-                  versionName "${{ github.event.inputs.version_name }}"
-              }
-
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-          }
-
-          dependencies {
-              compileOnly files('libs/api-82.jar')
-          }
-          EOF
-
-      - name: Create settings.gradle
-        run: |
-          cat > settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-
-          rootProject.name = "FuckDevicePolicy"
-          include ':app'
-          EOF
-
-      - name: Create root build.gradle
-        run: |
-          cat > build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.1.0' apply false
-          }
-          EOF
-
       - name: Setup Gradle Wrapper
         run: |
           # Clean up any existing gradle files
-          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties settings.gradle
+          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties
           
           # Create gradle wrapper properties manually to force version 8.5
           mkdir -p gradle/wrapper
@@ -697,68 +620,95 @@ jobs:
                   # IBM's JDK on AIX uses strange locations for the executables
                   JAVACMD="$JAVA_HOME/jre/sh/java"
               else
-                  JAVACMD="$JAVA_HOME/bin/java"
+                  JAVACMD="$JAVA_HOME/bin/
+                        java"
               fi
               if [ ! -x "$JAVACMD" ] ; then
                   die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-
+          
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
               fi
           else
               JAVACMD="java"
               which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-
+          
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
           fi
           
-          # Escape application args
-          save () {
-              for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
-              echo " "
-          }
-          APP_ARGS=$(save "$@")
+          # Increase the maximum file descriptors if we can.
+          if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
+              MAX_FD_LIMIT=$(ulimit -H -n)
+              if [ $? -eq 0 ] ; then
+                  if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
+                      MAX_FD="$MAX_FD_LIMIT"
+                  fi
+                  ulimit -n $MAX_FD
+                  if [ $? -ne 0 ] ; then
+                      warn "Could not set maximum file descriptor limit: $MAX_FD"
+                  fi
+              else
+                  warn "Could not query maximum file descriptor limit: $MAX_FD_LIMIT"
+              fi
+          fi
           
-          # Collect all arguments for the java command
-          eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
+          # For Darwin, add options to specify how the application appears in the dock
+          if [ "$darwin" = "true" ]; then
+              GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
+          fi
+          
+          # For Cygwin or MSYS, switch paths to Windows format before running java
+          if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
+              APP_HOME=$(cygpath --path --mixed "$APP_HOME")
+              CLASSPATH=$(cygpath --path --mixed "$CLASSPATH")
+              
+              JAVACMD=$(cygpath --unix "$JAVACMD")
+          fi
+          
+          # Collect all arguments for the java command; same as above
+          set -- \
+              "-Dorg.gradle.appname=$APP_BASE_NAME" \
+              -classpath "\"$CLASSPATH\"" \
+              org.gradle.wrapper.GradleWrapperMain \
+              "$@"
           
           exec "$JAVACMD" "$@"
           EOF
           
           chmod +x gradlew
           
-          # Create settings.gradle for dependency resolution management
-          cat > settings.gradle << 'EOF'
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = 'FuckDevicePolicy'
-          include ':app'
-          EOF
-          
-          # Update build.gradle with buildscript repositories
+          echo "Gradle wrapper setup completed"
+
+      - name: Create build.gradle files
+        run: |
+          # Create root build.gradle
           cat > build.gradle << 'EOF'
           buildscript {
+              ext.kotlin_version = '1.9.10'
               repositories {
                   google()
                   mavenCentral()
               }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.2'
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
               }
           }
           
-          tasks.register('clean', Delete) {
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          task clean(type: Delete) {
               delete rootProject.buildDir
           }
           EOF
           
+          # Create app/build.gradle
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
@@ -772,8 +722,8 @@ jobs:
                   applicationId "com.fuckdevicepolicy"
                   minSdk 21
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0.0"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code }}")
+                  versionName "${{ github.event.inputs.version_name }}"
               }
               
               buildTypes {
@@ -787,179 +737,193 @@ jobs:
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
               }
+              
+              packagingOptions {
+                  resources {
+                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
+                  }
+              }
           }
           
           dependencies {
-              compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+              implementation fileTree(dir: 'libs', include: ['*.jar'])
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.12.0'
           }
+          EOF
+          
+          # Create settings.gradle
+          cat > settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "FuckDevicePolicy"
+          include ':app'
           EOF
           
           # Create gradle.properties
           cat > gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.configureondemand=true
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
-          
-          echo "Gradle wrapper setup complete"
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+      - name: Create proguard-rules.pro
+        run: |
+          cat > app/proguard-rules.pro << 'EOF'
+          # Add project specific ProGuard rules here.
+          -keep class de.robv.android.xposed.** { *; }
+          -keep class com.fuckdevicepolicy.** { *; }
+          -dontwarn de.robv.android.xposed.**
+          EOF
+
+      - name: Set up Gradle permissions and validate
+        run: |
+          chmod +x gradlew
+          echo "Gradle wrapper permissions set"
+          
+          # Validate gradle setup
+          ls -la gradlew
+          ls -la gradle/wrapper/
+          
+          # Test gradle wrapper
+          ./gradlew --version
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Build APK
         run: |
-          # Set default values if environment variables are empty
-          export VERSION_CODE=${VERSION_CODE:-1}
-          export VERSION_NAME=${VERSION_NAME:-"1.0.0"}
+          echo "Starting APK build..."
+          ./gradlew clean assembleRelease --stacktrace --info
           
-          echo "Building with VERSION_CODE=$VERSION_CODE, VERSION_NAME=$VERSION_NAME"
-          
-          # Use the wrapper to build the app module
-          ./gradlew :app:assembleRelease --stacktrace --info
-
-      - name: Verify APK exists
-        run: |
-          echo "Checking for APK files..."
-          find app/build/outputs/apk -name "*.apk" -type f
-          
-          if [ ! -f "app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
-            echo "Error: Release APK not found!"
-            echo "Available files in outputs:"
-            find app/build/outputs -type f
-            exit 1
+          # Verify APK was created
+          if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+              echo "✅ APK build successful"
+              ls -la app/build/outputs/apk/release/
+          else
+              echo "❌ APK build failed - file not found"
+              exit 1
           fi
-          
-          echo "✅ Release APK created successfully"
-
-      - name: Get APK info
-        run: |
-          APK_FILE="app/build/outputs/apk/release/app-release-unsigned.apk"
-          APK_SIZE=$(stat -c%s "$APK_FILE" 2>/dev/null || stat -f%z "$APK_FILE")
-          APK_SIZE_MB=$(echo "scale=2; $APK_SIZE/1024/1024" | bc -l 2>/dev/null || echo "N/A")
-          
-          echo "APK_SIZE_BYTES=$APK_SIZE" >> $GITHUB_ENV
-          echo "APK_SIZE_MB=$APK_SIZE_MB" >> $GITHUB_ENV
-          
-          echo "APK Size: $APK_SIZE bytes ($APK_SIZE_MB MB)"
 
       - name: Rename APK
         run: |
           cd app/build/outputs/apk/release
-          APK_FILE=$(ls *.apk | head -n1)
-          NEW_NAME="FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
-          mv "$APK_FILE" "$NEW_NAME"
-          echo "APK_FILENAME=$NEW_NAME" >> $GITHUB_ENV
-          echo "✅ APK renamed to: $NEW_NAME"
+          mv app-release.apk "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+          echo "APK renamed successfully"
 
       - name: Generate release notes
+        id: release_notes
         run: |
-          VERSION_NAME="${{ github.event.inputs.version_name }}"
-          VERSION_CODE="${{ github.event.inputs.version_code }}"
-          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
-          APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
+          cat > release_notes.md << 'EOF'
+          # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
           
-          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          ## 🚀 Enhanced Device Policy Bypass Module
           
-          cat > release_notes.md << EOF
-          # 🖕 FuckDevicePolicy v${VERSION_NAME}
+          ### ✨ New Features & Improvements
+          ${{ github.event.inputs.release_notes }}
           
-          **Enhanced Xposed Module for Comprehensive Device Policy Bypass**
+          ### 🔓 Comprehensive Policy Bypass Coverage
           
-          ## 🔓 What's Bypassed
+          #### 📱 Installation & Development
+          - ✅ **Unknown Sources Installation** - Install APKs from any source
+          - ✅ **Developer Settings Access** - Full access to debugging features
+          - ✅ **App Verification Bypass** - Skip Google Play Protect checks
           
-          This enhanced version comprehensively bypasses all major device policy restrictions:
+          #### 🔄 Cross-Profile Operations  
+          - ✅ **Copy/Paste Between Profiles** - Unrestricted clipboard access
+          - ✅ **Cross-Profile Sharing** - Share content between work/personal
+          - ✅ **Contact Search** - Access contacts across profiles
           
-          ✅ **Installation Restrictions:**
-          - \`no_install_unknown_sources\`
-          - \`no_install_unknown_sources_globally\`
+          #### 📡 Connectivity & Sharing
+          - ✅ **Bluetooth Sharing** - Unrestricted Bluetooth file transfers
+          - ✅ **WiFi Sharing** - Share admin-configured WiFi networks
+          - ✅ **Location Sharing** - Full location services access
           
-          ✅ **Developer/Debug Restrictions:**
-          - \`no_debugging_features\`
-          - Developer settings access
+          #### 🎯 System Features
+          - ✅ **Content Capture** - Enable content capture services
+          - ✅ **Camera Access** - Bypass camera restrictions
+          - ✅ **Window Creation** - Allow system overlay windows
+          - ✅ **System Error Dialogs** - Show all system error messages
+          - ✅ **Fun Features** - Remove "no fun" restrictions
           
-          ✅ **Cross-Profile Restrictions:**
-          - \`no_cross_profile_copy_paste\` 
-          - \`no_sharing_into_profile\`
+          ### 📋 Requirements
+          - 🔧 **LSPosed** or **Xposed Framework** (Required)
+          - 📱 **Android 5.0+** (API 21+)
+          - 🔓 **Root Access** (For Xposed installation)
           
-          ✅ **Communication Restrictions:**
-          - \`no_bluetooth_sharing\`
-          - \`no_sharing_admin_configured_wifi\`
-          
-          ✅ **Content & Privacy Restrictions:**
-          - \`no_content_capture\`
-          - \`no_share_location\`
-          
-          ✅ **System Restrictions:**
-          - \`no_fun\` (
-
-          ✅ **System Restrictions:**
-          - \`no_fun\` (camera, games, entertainment apps)
-          - \`no_create_windows\`
-          - \`no_system_error_dialogs\`
-          - \`ensure_verify_apps\`
-          
-          ## 📦 Build Information
-          
-          - **Version:** ${VERSION_NAME} (Build ${VERSION_CODE})
-          - **Build Date:** ${BUILD_DATE}
-          - **APK Size:** ${APK_SIZE_MB} MB
-          - **Min SDK:** 21 (Android 5.0+)
-          - **Target SDK:** 34 (Android 14)
-          
-          ## 🛠️ Installation Requirements
-          
-          1. **Root Access Required**
-          2. **LSPosed Framework** (recommended) or **Xposed Framework**
-          3. Android 5.0+ (API 21+)
-          
-          ## 📱 Installation Steps
-          
+          ### 🛠️ Installation Instructions
           1. Install LSPosed/Xposed Framework
-          2. Download and install this APK
-          3. Enable the module in LSPosed/Xposed
-          4. **Reboot your device**
-          5. Verify module is working by checking restrictions
+          2. Install this APK
+          3. Enable module in LSPosed/Xposed Manager
+          4. Reboot device
+          5. Enjoy unrestricted device access! 🎉
           
-          ## 🎯 Targeted Packages
+          ### ⚠️ Important Notes
+          - This module bypasses enterprise device policies
+          - Use responsibly and in compliance with your organization's policies
+          - May trigger security warnings - this is expected behavior
+          - Reboot required after enabling the module
           
-          The module hooks into these critical system packages:
-          - \`android\` (System Framework)
-          - \`com.android.settings\`
-          - \`com.android.packageinstaller\`
-          - \`com.google.android.packageinstaller\`
-          - \`com.android.systemui\`
+          ### 🔍 Supported Restrictions
+          ```
+          ❌ no_install_unknown_sources
+          ❌ no_install_unknown_sources_globally  
+          ❌ no_debugging_features
+          ❌ no_cross_profile_copy_paste
+          ❌ no_sharing_into_profile
+          ❌ no_bluetooth_sharing
+          ❌ no_content_capture
+          ❌ no_fun
+          ❌ no_share_location
+          ❌ no_create_windows
+          ❌ no_sharing_admin_configured_wifi
+          ❌ no_system_error_dialogs
+          ❌ ensure_verify_apps
+          ```
           
-          ## ⚠️ Warnings
-          
-          - **For educational/research purposes only**
-          - May void device warranty
-          - Use at your own risk
-          - Not responsible for device damage
-          - Bypass corporate/enterprise policies responsibly
-          
-          ## 🔄 Changelog
-          
-          ${RELEASE_NOTES}
+          ### 🐛 Troubleshooting
+          - **Module not working?** Ensure LSPosed is active and reboot
+          - **Still restricted?** Check if the restriction is app-specific
+          - **Crashes?** Check Xposed logs for details
           
           ---
           
-          **🖕 Fuck restrictive device policies!**
-          
-          *Built with love and rebellion against corporate control* ❤️
+          **⚡ Built with GitHub Actions** | **🔧 Version ${{ github.event.inputs.version_name }}** | **📅 $(date +'%Y-%m-%d')**
           EOF
           
-          echo "Generated release notes"
+          echo "Release notes generated successfully"
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.event.inputs.version_name }}
+          tag_name: "v${{ github.event.inputs.version_name }}"
           name: "🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}"
           body_path: release_notes.md
           files: |
-            app/build/outputs/apk/release/${{ env.APK_FILENAME }}
-          draft: false
+            app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
           prerelease: ${{ github.event.inputs.prerelease }}
           generate_release_notes: false
         env:
@@ -969,47 +933,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FuckDevicePolicy-v${{ github.event.inputs.version_name }}
-          path: app/build/outputs/apk/release/${{ env.APK_FILENAME }}
+          path: app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
           retention-days: 30
 
       - name: Build Summary
         run: |
-          echo "## 🖕 FuckDevicePolicy Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Build Completed Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 APK Details" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ github.event.inputs.version_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version Code:** ${{ github.event.inputs.version_code }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **APK Size:** ${{ env.APK_SIZE_MB }} MB" >> $GITHUB_STEP_SUMMARY
-          echo "- **APK File:** ${{ env.APK_FILENAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **File:** FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size:** $(du -h app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔓 Enhanced Features" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Unknown Sources Installation Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Developer/Debug Features Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Cross-Profile Restrictions Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Bluetooth & WiFi Sharing Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Content Capture Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Location Sharing Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Camera & Fun Features Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ System Dialog Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ App Verification Bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Window Creation Bypass" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Module Features" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Enhanced Xposed hook implementation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Comprehensive device policy bypass" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Modern Android compatibility (API 21-34)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ LSPosed framework support" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🛠️ Installation" >> $GITHUB_STEP_SUMMARY
-          echo "1. Install LSPosed/Xposed Framework" >> $GITHUB_STEP_SUMMARY
-          echo "2. Install the APK" >> $GITHUB_STEP_SUMMARY
-          echo "3. Enable module in LSPosed/Xposed" >> $GITHUB_STEP_SUMMARY
-          echo "4. **Reboot device**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ⚠️ Requirements" >> $GITHUB_STEP_SUMMARY
-          echo "- Root access" >> $GITHUB_STEP_SUMMARY
-          echo "- LSPosed/Xposed Framework" >> $GITHUB_STEP_SUMMARY
-          echo "- Android 5.0+ (API 21+)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**🖕 Successfully built comprehensive device policy bypass!**" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the APK from the release or artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install on device with LSPosed/Xposed" >> $GITHUB_STEP_SUMMARY
+          echo "3. Enable module and reboot" >> $GITHUB_STEP_SUMMARY
+          echo "4. Enjoy unrestricted device access! 🎉" >> $GITHUB_STEP_SUMMARY
 
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up build artifacts..."
-          rm -rf ~/.gradle/caches
-          rm -rf ~/.android/build-cache
