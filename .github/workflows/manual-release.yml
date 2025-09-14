@@ -716,7 +716,7 @@ jobs:
               echo "$*"
               echo
               exit
-                    die () {
+          die () {
               echo
               echo "$*"
               echo
