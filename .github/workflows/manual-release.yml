@@ -644,42 +644,80 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
           
-          # Download gradle wrapper jar and scripts
+          # Download gradle wrapper jar
           curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar
           
-          # Create gradlew script
+          # Create proper gradlew script
           cat > gradlew << 'EOF'
           #!/bin/sh
           
-          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+          DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
           
           APP_NAME="Gradle"
-          APP_BASE_NAME=`basename "$0"`
+          APP_BASE_NAME=$(basename "$0")
           
-          GRADLE_USER_HOME=${GRADLE_USER_HOME:-$HOME/.gradle}
+          # Resolve links: $0 may be a link
+          PRG="$0"
+          while [ -h "$PRG" ] ; do
+              ls=$(ls -ld "$PRG")
+              link=$(expr "$ls" : '.*-> \(.*\)$')
+              if expr "$link" : '/.*' > /dev/null; then
+                  PRG="$link"
+              else
+                  PRG=$(dirname "$PRG")"/$link"
+              fi
+          done
+          SAVED="$(pwd)"
+          cd "$(dirname \"$PRG\")" >/dev/null
+          APP_HOME="$(pwd -P)"
+          cd "$SAVED" >/dev/null
           
+          # Determine the Java command to use to start the JVM.
           if [ -n "$JAVA_HOME" ] ; then
               if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  # IBM's JDK on AIX uses strange locations for the executables
                   JAVACMD="$JAVA_HOME/jre/sh/java"
               else
                   JAVACMD="$JAVA_HOME/bin/java"
               fi
               if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+          
+          Please set the JAVA_HOME variable in your environment to match the
+          location of your Java installation."
               fi
           else
               JAVACMD="java"
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+          
+          Please set the JAVA_HOME variable in your environment to match the
+          location of your Java installation."
           fi
           
-          GRADLE_OPTS="$GRADLE_OPTS \"-Dorg.gradle.appname=$APP_BASE_NAME\""
+          # Function to die with a message
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
+          }
           
-          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.wrapper.properties=gradle/wrapper/gradle-wrapper.properties\"" -classpath "gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+          # Escape application args
+          save () {
+              for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
+              echo " "
+          }
+          APP_ARGS=$(save "$@")
+          
+          # Collect all arguments for the java command; same as above, but using () instead of ""
+          eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
+          
+          exec "$JAVACMD" "$@"
           EOF
           
           chmod +x gradlew
           
-          # Update build.gradle files (clean versions)
+          # Update build.gradle files
           cat > build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -708,8 +746,6 @@ jobs:
               id 'com.android.application'
           }
           
-          apply plugin: 'com.android.application'
-          
           android {
               namespace 'com.fuckdevicepolicy'
               compileSdk 34
@@ -718,8 +754,8 @@ jobs:
                   applicationId "com.fuckdevicepolicy"
                   minSdk 21
                   targetSdk 34
-                  versionCode System.getenv('VERSION_CODE')?.toInteger() ?: 1
-                  versionName System.getenv('VERSION_NAME') ?: '1.0.0'
+                  versionCode 1
+                  versionName "1.0.0"
               }
               
               buildTypes {
@@ -755,6 +791,12 @@ jobs:
 
       - name: Build APK
         run: |
+          # Set default values if environment variables are empty
+          export VERSION_CODE=${VERSION_CODE:-1}
+          export VERSION_NAME=${VERSION_NAME:-"1.0.0"}
+          
+          echo "Building with VERSION_CODE=$VERSION_CODE, VERSION_NAME=$VERSION_NAME"
+          
           # Use the wrapper to ensure we use Gradle 8.5
           ./gradlew assembleRelease --stacktrace --info
         env:
