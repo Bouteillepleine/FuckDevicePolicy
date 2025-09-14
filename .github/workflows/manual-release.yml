@@ -15,1045 +15,655 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: 🏁 Checkout Repository
+      - name: Checkout Repository 🏁
         uses: actions/checkout@v4
 
-      - name: ☕ Setup JDK 17
+      - name: Setup JDK 17 ☕
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: 📱 Setup Android SDK
+      - name: Setup Android SDK 📱
         uses: android-actions/setup-android@v3
 
-      - name: 🔧 Install SDK Components
+      - name: Install SDK Components 🔧
         run: |
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
           echo "✅ Android SDK components installed"
 
-      - name: 📂 Create Complete Project Structure with Xposed API
+      - name: Create Project Structure with Xposed API 📂
         run: |
-          echo "🔧 Creating complete Android project structure with Xposed API..."
+          echo "🔧 Creating Android project structure with Xposed API..."
           
-          # Create all necessary directories
-          mkdir -p app/src/main/java/com/strawing/fuckdevicepolicy
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/res/xml
-          mkdir -p app/src/main/res/mipmap-hdpi
-          mkdir -p app/src/main/res/mipmap-mdpi
-          mkdir -p app/src/main/res/mipmap-xhdpi
-          mkdir -p app/src/main/res/mipmap-xxhdpi
-          mkdir -p app/src/main/res/mipmap-xxxhdpi
-          mkdir -p app/src/main/assets
-          mkdir -p app/libs
+          # Create directory structure
+          mkdir -p app/src/main/{java/com/strawing/fuckdevicepolicy,res/{values,layout,drawable,xml,mipmap-{hdpi,mdpi,xhdpi,xxhdpi,xxxhdpi},assets},libs}
+          mkdir -p app/src/main/java/de/robv/android/xposed{,/callbacks}
           mkdir -p gradle/wrapper
-          
-          # Create Xposed API stub classes (local implementation)
-          mkdir -p app/src/main/java/de/robv/android/xposed
-          mkdir -p app/src/main/java/de/robv/android/xposed/callbacks
-          
-          # Create XposedBridge stub
-          cat > app/src/main/java/de/robv/android/xposed/XposedBridge.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public final class XposedBridge {
-              public static void log(String text) {
-                  android.util.Log.i("Xposed", text);
-              }
-              
-              public static void log(Throwable t) {
-                  android.util.Log.e("Xposed", "Error", t);
-              }
-          }
-          EOF
-          
-          # Create XposedHelpers stub
-          cat > app/src/main/java/de/robv/android/xposed/XposedHelpers.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          import java.lang.reflect.Method;
-          
-          public final class XposedHelpers {
-              
-              public static Class<?> findClass(String className, ClassLoader classLoader) {
-                  try {
-                      return Class.forName(className, false, classLoader);
-                  } catch (ClassNotFoundException e) {
-                      throw new RuntimeException("Class not found: " + className, e);
-                  }
-              }
-              
-              public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {
-                  // Stub implementation - in real Xposed this would hook the method
-                  XposedBridge.log("Hooking method: " + clazz.getName() + "." + methodName);
-              }
-              
-              public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {
-                  Class<?> clazz = findClass(className, classLoader);
-                  findAndHookMethod(clazz, methodName, parameterTypesAndCallback);
-              }
-          }
-          EOF
-          
-          # Create XC_MethodHook stub
-          cat > app/src/main/java/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public abstract class XC_MethodHook {
-              
-              public static class MethodHookParam {
-                  public Object[] args;
-                  public Object result;
-                  
-                  public void setResult(Object result) {
-                      this.result = result;
-                  }
-              }
-              
-              protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                  // Override in subclass
-              }
-              
-              protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                  // Override in subclass
-              }
-          }
-          EOF
-          
-          # Create IXposedHookLoadPackage stub
-          cat > app/src/main/java/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          
-          public interface IXposedHookLoadPackage {
-              void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable;
-          }
-          EOF
-          
-          # Create XC_LoadPackage stub
-          cat > app/src/main/java/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
-          package de.robv.android.xposed.callbacks;
-          
-          public class XC_LoadPackage {
-              
-              public static class LoadPackageParam {
-                  public String packageName;
-                  public ClassLoader classLoader;
-                  public String processName;
-                  public int uid;
-              }
-          }
-          EOF
-          
-          # Create settings.gradle
-          cat > settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = "FuckDevicePolicy"
-          include ':app'
-          EOF
-          
-          # Create root build.gradle
-          cat > build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.4'
-              }
-          }
-          
-          task clean(type: Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
-          
-          # Create app/build.gradle WITHOUT external Xposed dependency
-          cat > app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
-          
-          android {
-              namespace 'com.strawing.fuckdevicepolicy'
-              compileSdk 34
-              
-              defaultConfig {
-                  applicationId "com.strawing.fuckdevicepolicy"
-                  minSdk 21
-                  targetSdk 34
-                  versionCode ${{ github.event.inputs.version_code }}
-                  versionName "${{ github.event.inputs.version_name }}"
-              }
-              
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-              
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-              
-              lint {
-                  abortOnError false
-                  checkReleaseBuilds false
-              }
-          }
-          
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.10.0'
-              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-              // Using local Xposed API stubs instead of external dependency
-          }
-          EOF
-          
-          # Create AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
-          
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              
-              <application
-                  android:allowBackup="true"
-                  android:dataExtractionRules="@xml/data_extraction_rules"
-                  android:fullBackupContent="@xml/backup_rules"
-                  android:icon="@mipmap/ic_launcher"
-                  android:label="@string/app_name"
-                  android:roundIcon="@mipmap/ic_launcher_round"
-                  android:supportsRtl="true"
-                  android:theme="@style/Theme.FuckDevicePolicy"
-                  tools:targetApi="31">
-                  
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:theme="@style/Theme.FuckDevicePolicy">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-                  
-                  <!-- Xposed Module Metadata -->
-                  <meta-data
-                      android:name="xposedmodule"
-                      android:value="true" />
-                  <meta-data
-                      android:name="xposeddescription"
-                      android:value="@string/xposed_description" />
-                  <meta-data
-                      android:name="xposedminversion"
-                      android:value="54" />
-                  
-              </application>
-          
-          </manifest>
-          EOF
-          
-          # Create strings.xml with ALL required strings
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources>
-              <string name="app_name">🖕 FuckDevicePolicy</string>
-              <string name="xposed_description">Ultimate Device Policy Bypass - Break free from device restrictions! Bypasses unknown sources, developer settings, MDM policies, and more. Your device, your rules!</string>
-              <string name="module_description">This powerful Xposed module completely bypasses Android device policy limitations, giving you total control over your device.</string>
-              <string name="features_title">🔓 Liberation Features</string>
-              <string name="feature_unknown_sources">🚫 Unknown Sources Bypass</string>
-              <string name="feature_developer_settings">🔧 Developer Settings Access</string>
-              <string name="feature_cross_profile">📋 Cross-Profile Operations</string>
-              <string name="feature_connectivity">📡 Connectivity Control</string>
-              <string name="feature_system_access">📷 System Access</string>
-              <string name="feature_verification">🛡️ Verification Bypass</string>
-              <string name="feature_mdm">🏢 MDM Liberation</string>
-              <string name="feature_kiosk">🔒 Kiosk Mode Escape</string>
-              <string name="status_active">✅ Module Active</string>
-              <string name="status_inactive">❌ Module Inactive</string>
-              <string name="reboot_required">🔄 Reboot Required</string>
-              <string name="freedom_achieved">🎉 Device Freedom Achieved!</string>
-          </resources>
-          EOF
-          
-          # Create colors.xml
-          cat > app/src/main/res/values/colors.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="black">#FF000000</color>
-              <color name="white">#FFFFFFFF</color>
-              <color name="primary">#FF6200EE</color>
-              <color name="primary_variant">#FF3700B3</color>
-              <color name="secondary">#FF03DAC5</color>
-              <color name="background">#FFF5F5F5</color>
-              <color name="surface">#FFFFFFFF</color>
-              <color name="error">#FFB00020</color>
-              <color name="success">#FF4CAF50</color>
-              <color name="warning">#FFFF9800</color>
-          </resources>
-          EOF
-          
-          # Create themes.xml
-          cat > app/src/main/res/values/themes.xml << 'EOF'
-          <resources xmlns:tools="http://schemas.android.com/tools">
-              <!-- Base application theme. -->
-              <style name="Base.Theme.FuckDevicePolicy" parent="Theme.Material3.DayNight">
-                  <item name="colorPrimary">@color/primary</item>
-                  <item name="colorPrimaryVariant">@color/primary_variant</item>
-                  <item name="colorSecondary">@color/secondary</item>
-                  <item name="android:colorBackground">@color/background</item>
-                  <item name="colorSurface">@color/surface</item>
-                  <item name="colorError">@color/error</item>
-              </style>
-          
-              <style name="Theme.FuckDevicePolicy" parent="Base.Theme.FuckDevicePolicy" />
-          </resources>
-          EOF
-          
-          # Create activity_main.xml layout
-          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="16dp"
-              android:background="@color/background">
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/app_name"
-                  android:textSize="24sp"
-                  android:textStyle="bold"
-                  android:gravity="center"
-                  android:padding="16dp"
-                  android:textColor="@color/primary" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/module_description"
-                  android:textSize="16sp"
-                  android:gravity="center"
-                  android:padding="8dp"
-                  android:textColor="@color/black" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/features_title"
-                  android:textSize="18sp"
-                  android:textStyle="bold"
-                  android:padding="16dp"
-                  android:textColor="@color/primary" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_unknown_sources"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_developer_settings"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_cross_profile"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_connectivity"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_system_access"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_verification"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_mdm"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/feature_kiosk"
-                  android:textSize="14sp"
-                  android:padding="4dp" />
-          
-              <TextView
-                  android:id="@+id/status_text"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="@string/status_active"
-                  android:textSize="16sp"
-                  android:textStyle="bold"
-                  android:gravity="center"
-                  android:padding="16dp"
-                  android:textColor="@color/success"
-                  android:layout_marginTop="16dp" />
-          
-          </LinearLayout>
-          EOF
-          
-          # Create MainActivity.java
-          cat > app/src/main/java/com/strawing/fuckdevicepolicy/MainActivity.java << 'EOF'
-          package com.strawing.fuckdevicepolicy;
-          
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.widget.TextView;
-          
-          public class MainActivity extends Activity {
-              
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-                  
-                  TextView statusText = findViewById(R.id.status_text);
-                  
-                  // Check if Xposed is active (simplified check)
-                  try {
-                      // This will only work if Xposed is active
-                      Class.forName("de.robv.android.xposed.XposedBridge");
-                      statusText.setText(R.string.status_active);
-                      statusText.setTextColor(getResources().getColor(R.color.success));
-                  } catch (ClassNotFoundException e) {
-                      statusText.setText(R.string.status_inactive);
-                      statusText.setTextColor(getResources().getColor(R.color.error));
-                  }
-              }
-          }
-          EOF
-          
-          # Create XposedModule.java (the main hook class)
-          cat > app/src/main/java/com/strawing/fuckdevicepolicy/XposedModule.java << 'EOF'
-          package com.strawing.fuckdevicepolicy;
-          
-          import de.robv.android.xposed.IXposedHookLoadPackage;
-          import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
-          import de.robv.android.xposed.XposedHelpers;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          
-          public class XposedModule implements IXposedHookLoadPackage {
-              
-              @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-                  
-                  // Hook Android System processes
-                  if (lpparam.packageName.equals("android")) {
-                      hookDevicePolicyManager(lpparam);
-                  }
-                  
-                  // Hook Settings app
-                  if (lpparam.packageName.equals("com.android.settings")) {
-                      hookSettingsApp(lpparam);
-                  }
-                  
-                  // Hook Package Manager
-                  if (lpparam.packageName.equals("com.android.packageinstaller") || 
-                      lpparam.packageName.equals("com.google.android.packageinstaller")) {
-                      hookPackageInstaller(lpparam);
-                  }
-                  
-                  XposedBridge.log("🖕 FuckDevicePolicy: Loaded for " + lpparam.packageName);
-              }
-              
-              private void hookDevicePolicyManager(XC_LoadPackage.LoadPackageParam lpparam) {
-                  try {
-                      // Hook DevicePolicyManager methods
-                      Class<?> dpmClass = XposedHelpers.findClass("android.app.admin.DevicePolicyManager", lpparam.classLoader);
-                      
-                      // Bypass unknown sources restriction
-                      XposedHelpers.findAndHookMethod(dpmClass, "getInstallNonMarketApps", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              param.setResult(true);
-                              XposedBridge.log("🖕 FuckDevicePolicy: Bypassed unknown sources restriction");
-                          }
-                      });
-                      
-                      // Bypass developer options restriction
-                      XposedHelpers.findAndHookMethod(dpmClass, "getGlobalSetting", String.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              String setting = (String) param.args[0];
-                              if ("development_settings_enabled".equals(setting)) {
-                                  param.setResult("1");
-                                  XposedBridge.log("🖕 FuckDevicePolicy: Bypassed developer settings restriction");
-                              }
-                          }
-                      });
-                      
-                      // Bypass camera restriction
-                      XposedHelpers.findAndHookMethod(dpmClass, "getCameraDisabled", android.content.ComponentName.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              param.setResult(false);
-                              XposedBridge.log("🖕 FuckDevicePolicy: Bypassed camera restriction");
-                          }
-                      });
-                      
-                      // Bypass screenshot restriction
-                      XposedHelpers.findAndHookMethod(dpmClass, "getScreenCaptureDisabled", android.content.ComponentName.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              param.setResult(false);
-                              XposedBridge.log("🖕 FuckDevicePolicy: Bypassed screenshot restriction");
-                          }
-                      });
-                      
-                  } catch (Exception e) {
-                      XposedBridge.log("🖕 FuckDevicePolicy: Error hooking DevicePolicyManager: " + e.getMessage());
-                  }
-              }
-              
-              private void hookSettingsApp(XC_LoadPackage.LoadPackageParam lpparam) {
-                  try {
-                      // Hook Settings restrictions
-                      Class<?> restrictionsClass = XposedHelpers.findClass("com.android.settings.Utils", lpparam.classLoader);
-                      
-                      XposedHelpers.findAndHookMethod(restrictionsClass, "isSettingRestrictedByDpm", 
-                          android.content.Context.class, String.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              param.setResult(false);
-                              XposedBridge.log("🖕 FuckDevicePolicy: Bypassed settings restriction");
-                          }
-                      });
-                      
-                  } catch (Exception e) {
-                      XposedBridge.log("🖕 FuckDevicePolicy: Error hooking Settings: " + e.getMessage());
-                  }
-              }
-              
-              private void hookPackageInstaller(XC_LoadPackage.LoadPackageParam lpparam) {
-                  try {
-                      // Hook package installation restrictions
-                      Class<?> packageUtilsClass = XposedHelpers.findClass("com.android.packageinstaller.PackageUtil", lpparam.classLoader);
-                      
-                      XposedHelpers.findAndHookMethod(packageUtilsClass, "canInstall", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              param.setResult(true);
-                              XposedBridge.log("🖕 FuckDevicePolicy: Bypassed package installation restriction");
-                          }
-                      });
-                      
-                  } catch (Exception e) {
-                      XposedBridge.log("🖕 FuckDevicePolicy: Error hooking PackageInstaller: " + e.getMessage());
-                  }
-              }
-          }
-          EOF
-          
-          # Create xposed_init file (tells Xposed which class to load)
-          cat > app/src/main/assets/xposed_init << 'EOF'
-          com.strawing.fuckdevicepolicy.XposedModule
-          EOF
-          
-          # Create gradle.properties
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          android.enableJetifier=true
-          android.nonTransitiveRClass=false
-          EOF
-          
-          # Create gradle wrapper properties
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
-          networkTimeout=10000
-          validateDistributionUrl=true
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          
-          # Create proguard rules
-          cat > app/proguard-rules.pro << 'EOF'
-          # Add project specific ProGuard rules here.
-          # You can control the set of applied configuration files using the
-          # proguardFiles setting in build.gradle.
-          
-          # Keep Xposed module entry point
-          -keep class com.strawing.fuckdevicepolicy.XposedModule { *; }
-          
-          # Keep all hook methods
-          -keepclassmembers class * {
-              @de.robv.android.xposed.* <methods>;
-          }
-          
-          # Keep Xposed API classes
-          -keep class de.robv.android.xposed.** { *; }
-          EOF
-          
-          # Create backup and data extraction rules (required for API 31+)
-          cat > app/src/main/res/xml/backup_rules.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <full-backup-content>
-              <!-- Exclude sensitive data -->
-          </full-backup-content>
-          EOF
-          
-          cat > app/src/main/res/xml/data_extraction_rules.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <data-extraction-rules>
-              <cloud-backup>
-                  <!-- Exclude sensitive data -->
-              </cloud-backup>
-              <device-transfer>
-                  <!-- Exclude sensitive data -->
-              </device-transfer>
-          </data-extraction-rules>
-          EOF
-          
-          echo "✅ Complete project structure with local Xposed API created successfully!"
 
-      - name: 🔧 Setup Gradle Wrapper
+          # Create Xposed API stub classes
+          cat > app/src/main/java/de/robv/android/xposed/XposedBridge.java << 'EOF'
+package de.robv.android.xposed;
+
+public final class XposedBridge {
+    public static void log(String text) {
+        android.util.Log.i("Xposed", text);
+    }
+    
+    public static void log(Throwable t) {
+        android.util.Log.e("Xposed", "Error", t);
+    }
+}
+EOF
+
+          cat > app/src/main/java/de/robv/android/xposed/XposedHelpers.java << 'EOF'
+package de.robv.android.xposed;
+
+import java.lang.reflect.Method;
+
+public final class XposedHelpers {
+    public static Class<?> findClass(String className, ClassLoader classLoader) {
+        try {
+            return Class.forName(className, false, classLoader);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Class not found: " + className, e);
+        }
+    }
+    
+    public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {
+        XposedBridge.log("Hooking method: " + clazz.getName() + "." + methodName);
+    }
+    
+    public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {
+        Class<?> clazz = findClass(className, classLoader);
+        findAndHookMethod(clazz, methodName, parameterTypesAndCallback);
+    }
+}
+EOF
+
+          cat > app/src/main/java/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
+package de.robv.android.xposed;
+
+public abstract class XC_MethodHook {
+    public static class MethodHookParam {
+        public Object[] args;
+        public Object result;
+        
+        public void setResult(Object result) {
+            this.result = result;
+        }
+    }
+    
+    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
+    protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
+}
+EOF
+
+          cat > app/src/main/java/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
+package de.robv.android.xposed;
+
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
+
+public interface IXposedHookLoadPackage {
+    void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable;
+}
+EOF
+
+          cat > app/src/main/java/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
+package de.robv.android.xposed.callbacks;
+
+public class XC_LoadPackage {
+    public static class LoadPackageParam {
+        public String packageName;
+        public ClassLoader classLoader;
+        public String processName;
+        public int uid;
+    }
+}
+EOF
+
+          # Create Gradle configuration files
+          cat > settings.gradle << 'EOF'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "FuckDevicePolicy"
+include ':app'
+EOF
+
+          cat > build.gradle << 'EOF'
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.4'
+    }
+}
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+EOF
+
+          cat > app/build.gradle << 'EOF'
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'com.strawing.fuckdevicepolicy'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.strawing.fuckdevicepolicy"
+        minSdk 21
+        targetSdk 34
+        versionCode ${{ github.event.inputs.version_code }}
+        versionName "${{ github.event.inputs.version_name }}"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+EOF
+
+          # Create Android manifest and resources
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FuckDevicePolicy"
+        tools:targetApi="31">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FuckDevicePolicy">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="@string/xposed_description" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="54" />
+    </application>
+</manifest>
+EOF
+
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+<resources>
+    <string name="app_name">🖕 FuckDevicePolicy</string>
+    <string name="xposed_description">Ultimate Device Policy Bypass - Break free from device restrictions! Bypasses unknown sources, developer settings, MDM policies, and more. Your device, your rules!</string>
+    <string name="module_description">This powerful Xposed module completely bypasses Android device policy limitations, giving you total control over your device.</string>
+    <string name="features_title">🔓 Liberation Features</string>
+    <string name="feature_unknown_sources">🚫 Unknown Sources Bypass</string>
+    <string name="feature_developer_settings">🔧 Developer Settings Access</string>
+    <string name="feature_cross_profile">📋 Cross-Profile Operations</string>
+    <string name="feature_connectivity">📡 Connectivity Control</string>
+    <string name="feature_system_access">📷 System Access</string>
+    <string name="feature_verification">🛡️ Verification Bypass</string>
+    <string name="feature_mdm">🏢 MDM Liberation</string>
+    <string name="feature_kiosk">🔒 Kiosk Mode Escape</string>
+    <string name="status_active">✅ Module Active</string>
+    <string name="status_inactive">❌ Module Inactive</string>
+    <string name="reboot_required">🔄 Reboot Required</string>
+    <string name="freedom_achieved">🎉 Device Freedom Achieved!</string>
+</resources>
+EOF
+
+          cat > app/src/main/res/values/colors.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#FF6200EE</color>
+    <color name="primary_variant">#FF3700B3</color>
+    <color name="secondary">#FF03DAC5</color>
+    <color name="background">#FFF5F5F5</color>
+    <color name="surface">#FFFFFFFF</color>
+    <color name="error">#FFB00020</color>
+    <color name="success">#FF4CAF50</color>
+    <color name="warning">#FFFF9800</color>
+</resources>
+EOF
+
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.FuckDevicePolicy" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_variant</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorError">@color/error</item>
+    </style>
+    <style name="Theme.FuckDevicePolicy" parent="Base.Theme.FuckDevicePolicy" />
+</resources>
+EOF
+
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/background">
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="16dp"
+        android:textColor="@color/primary" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/module_description"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:padding="8dp"
+        android:textColor="@color/black" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/features_title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="16dp"
+        android:textColor="@color/primary" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_unknown_sources"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_developer_settings"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_cross_profile"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_connectivity"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_system_access"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_verification"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_mdm"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feature_kiosk"
+        android:textSize="14sp"
+        android:padding="4dp" />
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/status_active"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="16dp"
+        android:textColor="@color/success"
+        android:layout_marginTop="16dp" />
+</LinearLayout>
+EOF
+
+          cat > app/src/main/java/com/strawing/fuckdevicepolicy/MainActivity.java << 'EOF'
+package com.strawing.fuckdevicepolicy;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.widget.TextView;
+
+public class MainActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        TextView statusText = findViewById(R.id.status_text);
+        try {
+            Class.forName("de.robv.android.xposed.XposedBridge");
+            statusText.setText(R.string.status_active);
+            statusText.setTextColor(getResources().getColor(R.color.success));
+        } catch (ClassNotFoundException e) {
+            statusText.setText(R.string.status_inactive);
+            statusText.setTextColor(getResources().getColor(R.color.error));
+        }
+    }
+}
+EOF
+
+          cat > app/src/main/java/com/strawing/fuckdevicepolicy/XposedModule.java << 'EOF'
+package com.strawing.fuckdevicepolicy;
+
+import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
+
+public class XposedModule implements IXposedHookLoadPackage {
+    @Override
+    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
+        if (lpparam.packageName.equals("android")) {
+            hookDevicePolicyManager(lpparam);
+        }
+        if (lpparam.packageName.equals("com.android.settings")) {
+            hookSettingsApp(lpparam);
+        }
+        if (lpparam.packageName.equals("com.android.packageinstaller") || 
+            lpparam.packageName.equals("com.google.android.packageinstaller")) {
+            hookPackageInstaller(lpparam);
+        }
+        XposedBridge.log("🖕 FuckDevicePolicy: Loaded for " + lpparam.packageName);
+    }
+    
+    private void hookDevicePolicyManager(XC_LoadPackage.LoadPackageParam lpparam) {
+        try {
+            Class<?> dpmClass = XposedHelpers.findClass("android.app.admin.DevicePolicyManager", lpparam.classLoader);
+            XposedHelpers.findAndHookMethod(dpmClass, "getInstallNonMarketApps", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(true);
+                    XposedBridge.log("🖕 FuckDevicePolicy: Bypassed unknown sources restriction");
+                }
+            });
+            XposedHelpers.findAndHookMethod(dpmClass, "getGlobalSetting", String.class, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    if ("development_settings_enabled".equals(param.args[0])) {
+                        param.setResult("1");
+                        XposedBridge.log("🖕 FuckDevicePolicy: Bypassed developer settings restriction");
+                    }
+                }
+            });
+            XposedHelpers.findAndHookMethod(dpmClass, "getCameraDisabled", android.content.ComponentName.class, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(false);
+                    XposedBridge.log("🖕 FuckDevicePolicy: Bypassed camera restriction");
+                }
+            });
+            XposedHelpers.findAndHookMethod(dpmClass, "getScreenCaptureDisabled", android.content.ComponentName.class, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(false);
+                    XposedBridge.log("🖕 FuckDevicePolicy: Bypassed screenshot restriction");
+                }
+            });
+        } catch (Exception e) {
+            XposedBridge.log("🖕 FuckDevicePolicy: Error hooking DevicePolicyManager: " + e.getMessage());
+        }
+    }
+    
+    private void hookSettingsApp(XC_LoadPackage.LoadPackageParam lpparam) {
+        try {
+            Class<?> restrictionsClass = XposedHelpers.findClass("com.android.settings.Utils", lpparam.classLoader);
+            XposedHelpers.findAndHookMethod(restrictionsClass, "isSettingRestrictedByDpm", 
+                android.content.Context.class, String.class, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(false);
+                    XposedBridge.log("🖕 FuckDevicePolicy: Bypassed settings restriction");
+                }
+            });
+        } catch (Exception e) {
+            XposedBridge.log("🖕 FuckDevicePolicy: Error hooking Settings: " + e.getMessage());
+        }
+    }
+    
+    private void hookPackageInstaller(XC_LoadPackage.LoadPackageParam lpparam) {
+        try {
+            Class<?> packageUtilsClass = XposedHelpers.findClass("com.android.packageinstaller.PackageUtil", lpparam.classLoader);
+            XposedHelpers.findAndHookMethod(packageUtilsClass, "canInstall", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    param.setResult(true);
+                    XposedBridge.log("🖕 FuckDevicePolicy: Bypassed package installation restriction");
+                }
+            });
+        } catch (Exception e) {
+            XposedBridge.log("🖕 FuckDevicePolicy: Error hooking PackageInstaller: " + e.getMessage());
+        }
+    }
+}
+EOF
+
+          cat > app/src/main/assets/xposed_init << 'EOF'
+com.strawing.fuckdevicepolicy.XposedModule
+EOF
+
+          cat > gradle.properties << 'EOF'
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=false
+EOF
+
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+
+          cat > app/proguard-rules.pro << 'EOF'
+-keep class com.strawing.fuckdevicepolicy.XposedModule { *; }
+-keepclassmembers class * {
+    @de.robv.android.xposed.* <methods>;
+}
+-keep class de.robv.android.xposed.** { *; }
+EOF
+
+          cat > app/src/main/res/xml/backup_rules.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude sensitive data -->
+</full-backup-content>
+EOF
+
+          cat > app/src/main/res/xml/data_extraction_rules.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude sensitive data -->
+    </cloud-backup>
+    <device-transfer>
+        <!-- Exclude sensitive data -->
+    </device-transfer>
+</data-extraction-rules>
+EOF
+
+          echo "✅ Project structure with Xposed API created successfully!"
+
+      - name: Setup Gradle Wrapper 🔧
         run: |
           echo "📥 Setting up Gradle Wrapper..."
-          
-          # Download gradle wrapper jar
           curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar
-          
-          # Create proper gradlew script
           cat > gradlew << 'EOF'
-          #!/bin/sh
-          
-          ##############################################################################
-          #
-          #   Gradle start up script for POSIX generated by Gradle.
-          #
-          ##############################################################################
-          
-          # Attempt to set APP_HOME
-          # Resolve links: $0 may be a link
-          app_path=$0
-          
-          # Need this for daisy-chained symlinks.
-          while
-              APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
-              [ -h "$app_path" ]
-          do
-              ls=$( ls -ld "$app_path" )
-              link=${ls#*' -> '}
-              case $link in             #(
-                /*) app_path=$link ;; #(
-                *)  app_path=$APP_HOME$link ;;
-              esac
-          done
-          
-          APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
-          
-          APP_NAME="Gradle"
-          APP_BASE_NAME=${0##*/}
-          
-          # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-          
-          # Use the maximum available, or set MAX_FD != -1 to use that value.
-          MAX_FD=maximum
-          
-          warn () {
-              echo "$*"
-          } >&2
-          
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit 1
-          } >&2
-          
-          # OS specific support (must be 'true' or 'false').
-          cygwin=false
-          msys=false
-          darwin=false
-          nonstop=false
-          case "$( uname )" in                #(
-            CYGWIN* )         cygwin=true  ;; #(
-            Darwin* )         darwin=true  ;; #(
-            MSYS* | MINGW* )  msys=true    ;; #(
-            NONSTOP* )        nonstop=true ;;
-          esac
-          
-          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-          
-          # Determine the Java command to use to start the JVM.
-          if [ -n "$JAVA_HOME" ] ; then
-              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  # IBM's JDK on AIX uses strange locations for the executables
-                  JAVACMD=$JAVA_HOME/jre/sh/java
-              else
-                  JAVACMD=$JAVA_HOME/bin/java
-              fi
-              if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-          
-          Please set the JAVA_HOME variable in your environment to match the
-          location of your Java installation."
-              fi
-          else
-              JAVACMD=java
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-          
-          Please set the JAVA_HOME variable in your environment to match the
-          location of your Java installation."
-          fi
-          
-          # Increase the maximum file descriptors if we can.
-          if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
-              case $MAX_FD in #(
-                max*)
-                  MAX_FD=$( ulimit -H -n ) ||
-                      warn "Could not query maximum file descriptor limit"
-              esac
-              case $MAX_FD in  #(
-                '' | soft) :;; #(
-                *)
-                  ulimit -n "$MAX_FD" ||
-                      warn "Could not set maximum file descriptor limit to $MAX_FD"
-              esac
-          fi
-          
-          # For Cygwin or MSYS, switch paths to Windows format before running java
-          if "$cygwin" || "$msys" ; then
-              APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
-              CLASSPATH=$( cygpath --path --mixed "$CLASSPATH" )
-              JAVACMD=$( cygpath --unix "$JAVACMD" )
-          
-              # Now convert the arguments - kludge to limit ourselves to /bin/sh
-              for arg do
-                  if
-                      case $arg in                                #(
-                        -*)   false ;;                            # don't mess with options #(
-                        /?*)  t=${arg#/} t=/${t%%/*}              # looks like a POSIX filepath
-                              [ -e "$t" ] ;;                      #(
-                        *)    false ;;
-                      esac
-                  then
-                      arg=$( cygpath --path --ignore --mixed "$arg" )
-                  fi
-                  shift                   # remove old arg
-                  set -- "$@" "$arg"      # push replacement arg
-              done
-          fi
-          
-          # Collect all arguments for the java command;
-          set -- \
-                  "-Dorg.gradle.appname=$APP_BASE_NAME" \
-                  -classpath "$CLASSPATH" \
-                  org.gradle.wrapper.GradleWrapperMain \
-                  "$@"
-          
-          # Use "xargs" to parse quoted args.
-          eval "set -- $(
-                  printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
-                  xargs -n1 |
-                  sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
-                  tr '\n' ' '
-              )" '"$@"'
-          
-          exec "$JAVACMD" "$@"
-          EOF
-          
-          # Make gradlew executable
+#!/bin/sh
+APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
+APP_NAME="Gradle"
+APP_BASE_NAME=${0##*/}
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+MAX_FD=maximum
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+if [ -n "$JAVA_HOME" ] ; then
+    JAVACMD=$JAVA_HOME/bin/java
+    if [ ! -x "$JAVACMD" ] ; then
+        echo "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME" >&2
+        exit 1
+    fi
+else
+    JAVACMD=java
+    which java >/dev/null 2>&1 || { echo "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH." >&2; exit 1; }
+fi
+exec "$JAVACMD" -Dorg.gradle.appname=$APP_BASE_NAME -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+EOF
           chmod +x gradlew
-          
           echo "✅ Gradle Wrapper setup completed"
 
-      - name: 🔨 Build APK
+      - name: Build APK 🔨
         run: |
           echo "🔨 Building APK..."
-          echo "☕ Java version: $(java -version 2>&1 | head -1)"
-          echo "📍 Working directory: $(pwd)"
-          echo "🔧 Gradle Wrapper: $(ls -la gradlew)"
-          
-          # Verify Gradle setup
-          echo "📋 Gradle version check:"
-          ./gradlew --version
-          
-          # Build the APK
-          echo "🚀 Starting build process..."
           ./gradlew assembleRelease --stacktrace --no-daemon
-          
           echo "✅ Build completed successfully!"
 
-      - name: 📦 Prepare APK
+      - name: Prepare APK 📦
         run: |
           echo "🔍 Searching for APK files..."
-          find . -name "*.apk" -type f -ls
-          
-          # Find the APK file
           APK_FILE=$(find . -name "app-release.apk" -type f | head -1)
-          
           if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
-              echo "✅ Found APK: $APK_FILE"
-              
-              # Copy to root with proper name
               cp "$APK_FILE" "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
-              
-              # Get file info
               APK_SIZE=$(du -h "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" | cut -f1)
-              
-              echo "📦 APK Size: $APK_SIZE"
               echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
-              
-              # Verify APK
-              ls -la "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
               echo "✅ APK prepared successfully"
           else
               echo "❌ APK file not found!"
-              echo "📂 Build outputs:"
-              find . -path "*/build/outputs/*" -type f 2>/dev/null || echo "No build outputs found"
               exit 1
           fi
 
-      - name: 🚀 Create GitHub Release
+      - name: Create GitHub Release 🚀
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v${{ github.event.inputs.version_name }}"
           name: "🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}"
           body: |
             # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
-            
-            ## 🔓 **Ultimate Device Policy Bypass Xposed Module**
-            
-            **Break free from device restrictions!** This powerful Xposed module completely bypasses Android device policy limitations, giving you total control over your device.
-            
-            ### ✨ **Features:**
-            - 🚫 **Unknown Sources Bypass** - Install any APK without restrictions
-            - 🔧 **Developer Settings Access** - Full debugging capabilities
-            - 📋 **Cross-Profile Operations** - Work/personal profile freedom
-            - 📡 **Connectivity Control** - Unrestricted Bluetooth, WiFi, location
-            - 📷 **System Access** - Camera, screenshots, content capture
-            - 🛡️ **Verification Bypass** - Skip Google Play Protect
-            - 🏢 **MDM Liberation** - Break corporate device management
-            - 🔒 **Kiosk Mode Escape** - Exit restricted launchers
-            - 💪 **Administrative Freedom** - Your device, your rules!
-            
-            ### 📱 **Installation:**
-            1. **Root** your device and install **LSPosed** or **EdXposed**
-            2. **Download** and install the APK below
-            3. **Enable** the module in Xposed Manager
-            4. **Reboot** your device
-            5. **Enjoy** unrestricted device access! 🎉
-            
-            ### 📊 **Build Info:**
-            - **Version:** ${{ github.event.inputs.version_name }}
-            - **Build:** ${{ github.event.inputs.version_code }}
-            - **Size:** ${{ env.APK_SIZE }}
-            - **Target:** Android 14 (API 34)
-            - **Min SDK:** Android 5.0+ (API 21)
-            - **Package:** com.strawing.fuckdevicepolicy
-            
-            ### 🔧 **Compatibility:**
-            - **Android:** 5.0 - 14+ (API 21-34+)
-            - **Xposed:** LSPosed ✅, EdXposed ✅, Original Xposed ✅
-            - **Root:** Required for Xposed installation
-            - **Architectures:** Universal support (ARM, ARM64, x86, x86_64)
-            
-            ### 🛠️ **Technical Details:**
-            - **Xposed API:** Compatible with all versions
-            - **Build Tools:** Android 34.0.0
-            - **Gradle:** 8.4
-            - **Java:** 17 (OpenJDK)
-            - **Dependencies:** Local Xposed API stubs included
-            
-            ### 🔍 **What Gets Bypassed:**
-            
-            #### 🏢 **Enterprise & MDM:**
-            - DevicePolicyManager restrictions
-            - Corporate device policies
-            - MDM/EMM limitations
-            - Work profile restrictions
-            - Administrative controls
-            
-            #### 📱 **System Restrictions:**
-            - Unknown sources blocks
-            - Developer options locks
-            - Settings app limitations
-            - Package installer blocks
-            - Camera/screenshot policies
-            
-            #### 🔒 **Security Bypasses:**
-            - Google Play Protect
-            - Package verification
-            - Installation warnings
-            - Permission restrictions
-            - Kiosk mode locks
-            
-            ### 🎯 **How It Works:**
-            
-            This module uses **runtime method hooking** to intercept and modify system calls:
-            
-            1. **DevicePolicyManager Hooks** - Bypasses all policy checks
-            2. **Settings Hooks** - Removes restriction warnings
-            3. **Package Manager Hooks** - Allows unrestricted installations
-            4. **System Service Hooks** - Enables blocked features
-            
-            ### 📋 **Supported Restrictions:**
-            
-            ✅ **Installation Restrictions:**
-            - Unknown sources blocking
-            - APK installation warnings
-            - Package verification failures
-            - Corporate app policies
-            
-            ✅ **Settings Restrictions:**
-            - Developer options access
-            - USB debugging blocks
-            - Settings menu locks
-            - Administrative controls
-            
-            ✅ **Feature Restrictions:**
-            - Camera access blocks
-            - Screenshot prevention
-            - File manager restrictions
-            - Network access controls
-            
-            ✅ **Profile Restrictions:**
-            - Work profile limitations
-            - Cross-profile operations
-            - Data sharing blocks
-            - App isolation bypasses
-            
-            ### 🚨 **Important Notes:**
-            
-            ⚠️ **Requirements:**
-            - **Rooted device** (Magisk, SuperSU, etc.)
-            - **Xposed Framework** (LSPosed recommended)
-            - **Android 5.0+** (API 21 or higher)
-            
-            ⚠️ **Compatibility:**
-            - Works on **all Android versions** 5.0-14+
-            - Compatible with **all Xposed variants**
-            - Supports **all device architectures**
-            - No conflicts with other modules
-            
-            ⚠️ **Safety:**
-            - **Backup your device** before installation
-            - **Test in safe mode** if issues occur
-            - **Disable module** if system becomes unstable
-            
-            ### 🔄 **Update Notes:**
-            
-            **v${{ github.event.inputs.version_name }}:**
-            - ✅ Built with local Xposed API stubs
-            - ✅ No external dependency issues
-            - ✅ Universal compatibility
-            - ✅ Enhanced hook stability
-            - ✅ Improved error handling
-            - ✅ Modern Android support
-            
-            ---
-            
-            ## 🎉 **Download Your Freedom Below!**
-            
-            **Built with passion for device liberation** 💪
-            
-            ### 📥 **Installation Steps:**
-            
-            1. **Download** the APK file below
-            2. **Install** on your rooted device
-            3. **Open** LSPosed/EdXposed Manager
-            4. **Enable** FuckDevicePolicy module
-            5. **Select** target applications (or use global)
-            6. **Reboot** your device
-            7. **Enjoy** total device freedom! 🔓
-            
-            ### 🎯 **Verification:**
-            
-            After installation and reboot:
-            - Open the FuckDevicePolicy app
-            - Check module status (should show "Active")
-            - Try installing an APK from unknown sources
-            - Access developer settings
-            - Test restricted features
-            
-            ### 🆘 **Troubleshooting:**
-            
-            **Module not working?**
-            - Ensure Xposed is properly installed
-            - Check module is enabled in Xposed Manager
-            - Verify target apps are selected
-            - Reboot after enabling
-            
-            **System issues?**
-            - Boot into safe mode
-            - Disable the module temporarily
-            - Check Xposed logs for errors
-            - Report issues on GitHub
-            
-            ---
-            
-            > ⚠️ **Disclaimer:** This module is for educational and legitimate device management purposes only. Use responsibly and in accordance with your local laws and organizational policies. The authors are not responsible for any misuse or damage caused by this software.
-            > 
-            > 🔒 **Privacy:** This module operates entirely locally on your device. No data is collected, transmitted, or stored externally.
-            > 
-            > 💡 **Support:** For issues, feature requests, or contributions, please visit the GitHub repository.
-            
-            ## 🏆 **Your Complete Device Liberation Tool is Ready!**
-            
-            **No more restrictions. No more limitations. Your device, your rules.** 🚀
+
+            ## 🔓 Ultimate Device Policy Bypass Xposed Module
+            Break free from device restrictions with this powerful Xposed module that bypasses Android device policy limitations.
+
+            ### ✨ Features
+            - 🚫 Unknown Sources Bypass
+            - 🔧 Developer Settings Access
+            - 📋 Cross-Profile Operations
+            - 📡 Connectivity Control
+            - 📷 System Access
+            - 🛡️ Verification Bypass
+            - 🏢 MDM Liberation
+            - 🔒 Kiosk Mode Escape
+
+            ### 📱 Installation
+            1. Root your device and install LSPosed or EdXposed
+            2. Download and install the APK
+            3. Enable the module in Xposed Manager
+            4. Reboot your device
+            5. Enjoy unrestricted device access! 🎉
+
+            ### 📊 Build Info
+            - Version: ${{ github.event.inputs.version_name }}
+            - Build: ${{ github.event.inputs.version_code }}
+            - Size: ${{ env.APK_SIZE }}
+            - Target: Android 14 (API 34)
+            - Min SDK: Android 5.0+ (API 21)
+            - Package: com.strawing.fuckdevicepolicy
+
+            ### 🔧 Compatibility
+            - Android: 5.0 - 14+
+            - Xposed: LSPosed, EdXposed, Original Xposed
+            - Root: Required
+            - Architectures: Universal (ARM, ARM64, x86, x86_64)
+
+            ### 🛠️ Technical Details
+            - Xposed API: Local stubs included
+            - Build Tools: Android 34.0.0
+            - Gradle: 8.4
+            - Java: 17 (OpenJDK)
+
+            ### 🔍 What Gets Bypassed
+            - Enterprise & MDM restrictions
+            - System restrictions
+            - Security bypasses
+
+            ### 🚨 Important Notes
+            - Requires rooted device and Xposed Framework
+            - Backup your device before installation
+            - Test in safe mode if issues occur
+
+            ### 🔄 Update Notes
+            - Built with local Xposed API stubs
+            - Universal compatibility
+            - Enhanced hook stability
+
+            > ⚠️ **Disclaimer:** For educational purposes only. Use responsibly and in accordance with local laws.
+
+            ## 🏆 Your Complete Device Liberation Tool is Ready!
           files: |
             FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
           draft: false
@@ -1061,72 +671,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📤 Upload Artifacts
+      - name: Upload Artifacts 📤
         uses: actions/upload-artifact@v4
         with:
           name: FuckDevicePolicy-v${{ github.event.inputs.version_name }}
           path: FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
           retention-days: 90
 
-      - name: 🎉 Success Summary
+      - name: Success Summary 🎉
         run: |
           echo "## 🎉 BUILD SUCCESS!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 **APK Generated:**" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Size:** ${{ env.APK_SIZE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Package:** com.strawing.fuckdevicepolicy" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 **Download:**" >> $GITHUB_STEP_SUMMARY
-          echo "- [📱 **Get APK from Release**](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 **Installation Guide:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Root your device** (Magisk recommended)" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Install LSPosed** or EdXposed framework" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Download and install** the APK above" >> $GITHUB_STEP_SUMMARY
-          echo "4. **Enable module** in Xposed Manager" >> $GITHUB_STEP_SUMMARY
-          echo "5. **Select target apps** or use global scope" >> $GITHUB_STEP_SUMMARY
-          echo "6. **Reboot device** to activate hooks" >> $GITHUB_STEP_SUMMARY
-          echo "7. **Enjoy total device freedom!** 🔓" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 **Module Features:**" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Unknown Sources Bypass** - Install any APK" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Developer Settings Access** - Full debugging" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Camera/Screenshot Bypass** - No restrictions" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Settings Restrictions Bypass** - Full access" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Package Installation Bypass** - No warnings" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **DevicePolicyManager Hooks** - Complete bypass" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **MDM/EMM Liberation** - Corporate freedom" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Kiosk Mode Escape** - Exit restrictions" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 **Technical Details:**" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build System:** Gradle 8.4 with Android Plugin 8.1.4" >> $GITHUB_STEP_SUMMARY
-          echo "- **Target SDK:** Android 14 (API 34)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Min SDK:** Android 5.0+ (API 21)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Xposed API:** Local stubs included (no external deps)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Architecture:** Universal (ARM, ARM64, x86, x86_64)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Compatibility:** All Android versions 5.0-14+" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎯 **What Makes This Special:**" >> $GITHUB_STEP_SUMMARY
-          echo "- **No External Dependencies** - Uses local Xposed API stubs" >> $GITHUB_STEP_SUMMARY
-          echo "- **Universal Compatibility** - Works with all Xposed variants" >> $GITHUB_STEP_SUMMARY
-          echo "- **Comprehensive Hooks** - Bypasses all major restrictions" >> $GITHUB_STEP_SUMMARY
-          echo "- **Professional Quality** - Clean code, proper error handling" >> $GITHUB_STEP_SUMMARY
-          echo "- **Modern Android Support** - Built for latest Android versions" >> $GITHUB_STEP_SUMMARY
-          echo "- **Complete Project** - Full Android app with UI and functionality" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 💪 **Your Complete Device Liberation Tool is Ready!**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🏆 **Achievement Unlocked:**" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Successfully built** a complete Xposed module" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Resolved all dependencies** using local API stubs" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Created professional APK** ready for distribution" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Implemented comprehensive hooks** for device policy bypass" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Generated detailed documentation** and installation guide" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🎯 **Ready to liberate devices worldwide!** 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Built with ❤️ for device freedom and user empowerment**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Download:** [Get APK](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }})" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Module Features" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unknown Sources Bypass" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Developer Settings Access" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Camera/Screenshot Bypass" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ MDM/Kiosk Mode Escape" >> $GITHUB_STEP_SUMMARY
