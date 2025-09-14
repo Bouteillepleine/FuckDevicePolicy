@@ -717,7 +717,7 @@ jobs:
           
           chmod +x gradlew
           
-          # Create settings.gradle to define repositories at settings level
+          # Create settings.gradle for dependency resolution management
           cat > settings.gradle << 'EOF'
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
@@ -730,9 +730,13 @@ jobs:
           rootProject.name = 'FuckDevicePolicy'
           EOF
           
-          # Update build.gradle files (simplified without repositories)
+          # Update build.gradle with buildscript repositories
           cat > build.gradle << 'EOF'
           buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.2'
               }
