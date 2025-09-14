@@ -1,18 +1,7 @@
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS) // Prefer settings repositories
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS) // This line enforces the rule
     repositories {
         google()
         mavenCentral()
     }
 }
-
-rootProject.name = "FuckDevicePolicy"
-include ':app'
