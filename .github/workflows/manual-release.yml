@@ -627,9 +627,99 @@ jobs:
           }
           EOF
 
-      - name: Create gradle wrapper
+      - name: Setup Gradle Wrapper
         run: |
-          gradle wrapper --gradle-version 8.0
+          # Use Gradle 8.5 (more stable than 8.0)
+          gradle wrapper --gradle-version 8.5 --distribution-type bin
+          
+          # Update build.gradle to fix compatibility issues
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application' version '8.1.2'
+          }
+          
+          android {
+              namespace 'com.fuckdevicepolicy'
+              compileSdk 34
+              
+              defaultConfig {
+                  applicationId "com.fuckdevicepolicy"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode System.getenv('VERSION_CODE')?.toInteger() ?: 1
+                  versionName System.getenv('VERSION_NAME') ?: '1.0.0'
+                  
+                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+              }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+              
+              packagingOptions {
+                  resources {
+                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
+                  }
+              }
+          }
+          
+          dependencies {
+              compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              
+              testImplementation 'junit:junit:4.13.2'
+              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+          }
+          EOF
+          
+          # Also update the root build.gradle
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.2'
+              }
+          }
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          tasks.register('clean', Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+          
+          # Update gradle.properties for compatibility
+          cat > gradle.properties << 'EOF'
+          # Project-wide Gradle settings
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          
+          # Android settings
+          android.useAndroidX=true
+          android.enableJetifier=true
+          android.nonTransitiveRClass=false
+          android.enableR8.fullMode=false
+          EOF
+          
+          echo "Updated Gradle configuration for compatibility"
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
