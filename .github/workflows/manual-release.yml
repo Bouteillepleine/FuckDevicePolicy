@@ -45,14 +45,17 @@ jobs:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: true
 
-      - name: Clean and create directories
+      - name: Complete cleanup and setup
         run: |
-          echo "Cleaning existing resources and creating fresh structure..."
+          echo "Performing complete cleanup..."
           
-          # Remove entire res directory to start completely fresh
-          rm -rf app/src/main/res 2>/dev/null || true
+          # Remove everything and start completely fresh
+          rm -rf app/src/main/java/* 2>/dev/null || true
+          rm -rf app/src/main/res/* 2>/dev/null || true
+          rm -rf app/libs/* 2>/dev/null || true
+          rm -rf app/build 2>/dev/null || true
           
-          # Create all necessary directories
+          # Create directory structure
           mkdir -p app/src/main/java/com/bouteillepleine/fuckdevicepolicy
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
@@ -61,9 +64,145 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xhdpi
           mkdir -p app/src/main/res/mipmap-xxhdpi
           mkdir -p app/src/main/res/mipmap-xxxhdpi
-          mkdir -p app/src/main/res/drawable
+          mkdir -p app/libs
+          mkdir -p app/src/main/assets
           
-          echo "✅ Clean directory structure created"
+          echo "✅ Complete cleanup done"
+
+      - name: Create Xposed API JAR properly
+        run: |
+          echo "Creating proper Xposed API JAR..."
+          
+          # Create temporary directory for compilation
+          mkdir -p temp_compile
+          cd temp_compile
+          
+          # Create proper package structure
+          mkdir -p de/robv/android/xposed
+          mkdir -p de/robv/android/xposed/callbacks
+          
+          # Create XposedBridge class
+          cat > de/robv/android/xposed/XposedBridge.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public class XposedBridge {
+              public static void log(String text) {
+                  // Stub implementation
+                  System.out.println("XposedBridge: " + text);
+              }
+              
+              public static void log(Throwable t) {
+                  // Stub implementation
+                  t.printStackTrace();
+              }
+              
+              public static void hookAllMethods(Class<?> hookClass, String methodName, XC_MethodHook callback) {
+                  // Stub implementation
+              }
+              
+              public static void hookAllConstructors(Class<?> hookClass, XC_MethodHook callback) {
+                  // Stub implementation
+              }
+          }
+          EOF
+          
+          # Create XC_MethodHook class
+          cat > de/robv/android/xposed/XC_MethodHook.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public abstract class XC_MethodHook {
+              public static class MethodHookParam {
+                  public Object[] args;
+                  public Object thisObject;
+                  private Object result;
+                  private boolean resultSet = false;
+                  
+                  public void setResult(Object result) {
+                      this.result = result;
+                      this.resultSet = true;
+                  }
+                  
+                  public Object getResult() {
+                      return result;
+                  }
+                  
+                  public boolean hasResult() {
+                      return resultSet;
+                  }
+              }
+              
+              protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                  // Override in subclass
+              }
+              
+              protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                  // Override in subclass
+              }
+          }
+          EOF
+          
+          # Create IXposedHookLoadPackage interface
+          cat > de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
+          
+          public interface IXposedHookLoadPackage {
+              void handleLoadPackage(LoadPackageParam lpparam) throws Throwable;
+          }
+          EOF
+          
+          # Create XposedHelpers class
+          cat > de/robv/android/xposed/XposedHelpers.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public class XposedHelpers {
+              public static Class<?> findClass(String className, ClassLoader classLoader) throws ClassNotFoundException {
+                  return Class.forName(className, false, classLoader);
+              }
+              
+              public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {
+                  // Stub implementation
+              }
+              
+              public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {
+                  // Stub implementation
+              }
+          }
+          EOF
+          
+          # Create XC_LoadPackage class
+          cat > de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
+          package de.robv.android.xposed.callbacks;
+          
+          public class XC_LoadPackage {
+              public static class LoadPackageParam {
+                  public String packageName;
+                  public ClassLoader classLoader;
+              }
+          }
+          EOF
+          
+          # Compile all Java files
+          echo "Compiling Xposed API stubs..."
+          find . -name "*.java" -print0 | xargs -0 javac -d .
+          
+          # Create JAR file
+          echo "Creating JAR file..."
+          jar cf ../app/libs/xposed-api-82.jar de/
+          
+          # Go back and cleanup
+          cd ..
+          rm -rf temp_compile
+          
+          # Verify JAR was created properly
+          if [ -f "app/libs/xposed-api-82.jar" ]; then
+              echo "✅ Xposed API JAR created successfully"
+              jar tf app/libs/xposed-api-82.jar | head -10
+          else
+              echo "❌ Failed to create Xposed API JAR"
+              exit 1
+          fi
 
       - name: Create missing resource files
         run: |
@@ -314,7 +453,6 @@ jobs:
         run: |
           echo "Creating xposed_init file..."
           
-          mkdir -p app/src/main/assets
           echo "com.bouteillepleine.fuckdevicepolicy.DevicePolicyHook" > app/src/main/assets/xposed_init
           
           echo "✅ xposed_init file created"
@@ -350,111 +488,6 @@ jobs:
           create_icon 192 "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
           
           echo "✅ Launcher icons created"
-
-      - name: Download Xposed API manually
-        run: |
-          echo "Downloading Xposed API manually..."
-          mkdir -p app/libs
-          
-          # Download Xposed API JAR from GitHub mirror
-          curl -L -o app/libs/xposed-api-82.jar \
-            "https://github.com/rovo89/XposedBridge/releases/download/v82/api-82.jar" || \
-          curl -L -o app/libs/xposed-api-82.jar \
-            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" || \
-          curl -L -o app/libs/xposed-api-82.jar \
-            "https://jcenter.bintray.com/de/robv/android/xposed/api/82/api-82.jar" || \
-          echo "Warning: Could not download Xposed API, will create stub"
-          
-          # If download failed, create a minimal stub
-          if [ ! -f "app/libs/xposed-api-82.jar" ]; then
-            echo "Creating Xposed API stub..."
-            mkdir -p temp_xposed/de/robv/android/xposed
-            
-            # Create minimal XposedBridge stub
-            cat > temp_xposed/de/robv/android/xposed/XposedBridge.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public class XposedBridge {
-              public static void log(String text) {}
-              public static void log(Throwable t) {}
-              public static void hookAllMethods(Class<?> hookClass, String methodName, XC_MethodHook callback) {}
-              public static void hookAllConstructors(Class<?> hookClass, XC_MethodHook callback) {}
-          }
-          EOF
-          
-            # Create XC_MethodHook stub
-            cat > temp_xposed/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public abstract class XC_MethodHook {
-              public static class MethodHookParam {
-                  public Object[] args;
-                  public Object thisObject;
-                  public void setResult(Object result) {}
-                  public Object getResult() { return null; }
-              }
-              
-              protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
-              protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
-          }
-          EOF
-          
-            # Create IXposedHookLoadPackage stub
-            cat > temp_xposed/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public interface IXposedHookLoadPackage {
-              void handleLoadPackage(LoadPackageParam lpparam) throws Throwable;
-              
-              class LoadPackageParam {
-                  public String packageName;
-                  public ClassLoader classLoader;
-              }
-          }
-          EOF
-          
-            # Create XposedHelpers stub
-            cat > temp_xposed/de/robv/android/xposed/XposedHelpers.java << 'EOF'
-          package de.robv.android.xposed;
-          
-          public class XposedHelpers {
-              public static Class<?> findClass(String className, ClassLoader classLoader) throws ClassNotFoundException {
-                  return Class.forName(className, false, classLoader);
-              }
-              
-              public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {}
-              public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {}
-          }
-          EOF
-          
-            # Create callbacks package
-            mkdir -p temp_xposed/de/robv/android/xposed/callbacks
-            cat > temp_xposed/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
-          package de.robv.android.xposed.callbacks;
-          
-          public class XC_LoadPackage {
-              public static class LoadPackageParam {
-                  public String packageName;
-                  public ClassLoader classLoader;
-              }
-          }
-          EOF
-          
-            # Compile stub classes
-            javac -d temp_xposed temp_xposed/de/robv/android/xposed/*.java temp_xposed/de/robv/android/xposed/callbacks/*.java
-            
-            # Create JAR
-            cd temp_xposed
-            jar cf ../app/libs/xposed-api-82.jar de/
-            cd ..
-            rm -rf temp_xposed
-            
-            echo "✅ Xposed API stub created"
-          else
-            echo "✅ Xposed API downloaded successfully"
-          fi
-          
-          ls -la app/libs/
 
       - name: Fix Gradle configuration
         run: |
@@ -720,8 +753,8 @@ jobs:
           APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
           
           # Get current date
-          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%
-      
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%
+
       - name: Generate release body
         run: |
           VERSION_NAME="${{ github.event.inputs.version_name }}"
@@ -799,3 +832,4 @@ jobs:
           echo "🔗 Links:"
           echo "- Release: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }}"
           echo "- APK Download: https://github.com/${{ github.repository }}/releases/download/v${{ github.event.inputs.version_name }}/${{ env.APK_FILENAME }}"
+
