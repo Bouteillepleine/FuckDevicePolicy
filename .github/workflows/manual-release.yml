@@ -883,7 +883,7 @@ jobs:
           echo "✅ Fragment files fixed - data binding dependencies removed!"
 
 
-            - name: 🔨 Build and Sign APK
+      - name: 🔨 Build and Sign APK
         run: |
           echo "🔨 Building and signing APK..."
           
