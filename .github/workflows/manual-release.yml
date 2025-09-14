@@ -630,7 +630,7 @@ jobs:
       - name: Setup Gradle Wrapper
         run: |
           # Clean up any existing gradle files
-          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties
+          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties settings.gradle
           
           # Create gradle wrapper properties manually to force version 8.5
           mkdir -p gradle/wrapper
@@ -717,22 +717,24 @@ jobs:
           
           chmod +x gradlew
           
-          # Update build.gradle files
-          cat > build.gradle << 'EOF'
-          buildscript {
+          # Create settings.gradle to define repositories at settings level
+          cat > settings.gradle << 'EOF'
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories {
                   google()
                   mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.2'
               }
           }
           
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
+          rootProject.name = 'FuckDevicePolicy'
+          EOF
+          
+          # Update build.gradle files (simplified without repositories)
+          cat > build.gradle << 'EOF'
+          buildscript {
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.2'
               }
           }
           
