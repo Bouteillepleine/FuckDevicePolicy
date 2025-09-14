@@ -703,24 +703,13 @@ jobs:
 
       - name: Create build.gradle files
         run: |
-          # Create root build.gradle
+          # Create root build.gradle (remove repositories from here)
           cat > build.gradle << 'EOF'
           buildscript {
               ext.kotlin_version = '1.9.10'
-              repositories {
-                  google()
-                  mavenCentral()
-              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.2'
                   classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-              }
-          }
-          
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
               }
           }
           
@@ -729,7 +718,7 @@ jobs:
           }
           EOF
           
-          # Create app/build.gradle
+          # Create app/build.gradle (same as before)
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
@@ -773,7 +762,7 @@ jobs:
           }
           EOF
           
-          # Create settings.gradle
+          # Create settings.gradle (allow project repos)
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -783,7 +772,7 @@ jobs:
               }
           }
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories {
                   google()
                   mavenCentral()
@@ -792,16 +781,6 @@ jobs:
           
           rootProject.name = "FuckDevicePolicy"
           include ':app'
-          EOF
-          
-          # Create gradle.properties
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.configureondemand=true
-          android.useAndroidX=true
-          android.enableJetifier=true
           EOF
 
       - name: Create proguard-rules.pro
