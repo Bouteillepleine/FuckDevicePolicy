@@ -43,19 +43,8 @@ jobs:
           # Root build.gradle (modern version for JDK 17)
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.4'
-              }
-          }
-          
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
               }
           }
           
@@ -98,9 +87,14 @@ jobs:
                   checkReleaseBuilds false
               }
           }
+          
+          dependencies {
+              // Add any necessary dependencies here, e.g., for Xposed if needed
+              // implementation 'de.robv.android.xposed:api:82'
+          }
           EOF
           
-          # settings.gradle
+          # settings.gradle (updated to include repositories)
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
