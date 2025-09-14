@@ -45,14 +45,14 @@ jobs:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: true
 
-      - name: Remove duplicate launcher icons
+      - name: Clean and create directories
         run: |
-          find app/src/main/res/mipmap-* -name "ic_launcher.png" -delete
-        shell: bash
-
-      - name: Create missing directories
-        run: |
-          echo "Creating missing directories..."
+          echo "Cleaning existing resources and creating fresh structure..."
+          
+          # Remove entire res directory to start completely fresh
+          rm -rf app/src/main/res 2>/dev/null || true
+          
+          # Create all necessary directories
           mkdir -p app/src/main/java/com/bouteillepleine/fuckdevicepolicy
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
@@ -62,7 +62,8 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xxhdpi
           mkdir -p app/src/main/res/mipmap-xxxhdpi
           mkdir -p app/src/main/res/drawable
-          echo "✅ Directories created"
+          
+          echo "✅ Clean directory structure created"
 
       - name: Create missing resource files
         run: |
@@ -172,6 +173,152 @@ jobs:
           
           echo "✅ MainActivity created"
 
+      - name: Create Xposed Hook Class
+        run: |
+          echo "Creating Xposed hook implementation..."
+          
+          cat > app/src/main/java/com/bouteillepleine/fuckdevicepolicy/DevicePolicyHook.java << 'EOF'
+          package com.bouteillepleine.fuckdevicepolicy;
+          
+          import de.robv.android.xposed.IXposedHookLoadPackage;
+          import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
+          import de.robv.android.xposed.XposedHelpers;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
+          
+          public class DevicePolicyHook implements IXposedHookLoadPackage {
+              
+              private static final String TAG = "FuckDevicePolicy";
+              
+              @Override
+              public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
+                  // Hook Android System Server for device policy restrictions
+                  if ("android".equals(lpparam.packageName)) {
+                      hookDevicePolicyManager(lpparam.classLoader);
+                  }
+                  
+                  // Hook common device policy apps
+                  if (isDevicePolicyApp(lpparam.packageName)) {
+                      hookDevicePolicyApp(lpparam.classLoader);
+                  }
+              }
+              
+              private void hookDevicePolicyManager(ClassLoader classLoader) {
+                  try {
+                      // Hook DevicePolicyManagerService
+                      Class<?> dpmsClass = XposedHelpers.findClass("com.android.server.devicepolicy.DevicePolicyManagerService", classLoader);
+                      
+                      // Bypass camera disabled restriction
+                      XposedHelpers.findAndHookMethod(dpmsClass, "getCameraDisabled", 
+                          "android.content.ComponentName", int.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(false);
+                              XposedBridge.log(TAG + ": Camera restriction bypassed");
+                          }
+                      });
+                      
+                      // Bypass screen capture disabled restriction
+                      XposedHelpers.findAndHookMethod(dpmsClass, "getScreenCaptureDisabled", 
+                          "android.content.ComponentName", int.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(false);
+                              XposedBridge.log(TAG + ": Screen capture restriction bypassed");
+                          }
+                      });
+                      
+                      // Bypass keyguard disabled features
+                      XposedHelpers.findAndHookMethod(dpmsClass, "getKeyguardDisabledFeatures", 
+                          "android.content.ComponentName", int.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(0); // No features disabled
+                              XposedBridge.log(TAG + ": Keyguard restrictions bypassed");
+                          }
+                      });
+                      
+                      // Bypass maximum time to lock
+                      XposedHelpers.findAndHookMethod(dpmsClass, "getMaximumTimeToLock", 
+                          "android.content.ComponentName", int.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(0L); // No time limit
+                              XposedBridge.log(TAG + ": Time lock restrictions bypassed");
+                          }
+                      });
+                      
+                      // Bypass password quality requirements
+                      XposedHelpers.findAndHookMethod(dpmsClass, "getPasswordQuality", 
+                          "android.content.ComponentName", int.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(0); // No password quality required
+                              XposedBridge.log(TAG + ": Password quality restrictions bypassed");
+                          }
+                      });
+                      
+                      XposedBridge.log(TAG + ": DevicePolicyManagerService hooked successfully");
+                      
+                  } catch (Throwable t) {
+                      XposedBridge.log(TAG + ": Error hooking DevicePolicyManagerService: " + t.getMessage());
+                  }
+              }
+              
+              private void hookDevicePolicyApp(ClassLoader classLoader) {
+                  try {
+                      // Hook DevicePolicyManager class in apps
+                      Class<?> dpmClass = XposedHelpers.findClass("android.app.admin.DevicePolicyManager", classLoader);
+                      
+                      // Make all policy checks return false/permissive values
+                      XposedHelpers.findAndHookMethod(dpmClass, "getCameraDisabled", 
+                          "android.content.ComponentName", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(false);
+                          }
+                      });
+                      
+                      XposedHelpers.findAndHookMethod(dpmClass, "getScreenCaptureDisabled", 
+                          "android.content.ComponentName", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              param.setResult(false);
+                          }
+                      });
+                      
+                      XposedBridge.log(TAG + ": DevicePolicyManager hooked in app: " + classLoader.toString());
+                      
+                  } catch (Throwable t) {
+                      XposedBridge.log(TAG + ": Error hooking app DevicePolicyManager: " + t.getMessage());
+                  }
+              }
+              
+              private boolean isDevicePolicyApp(String packageName) {
+                  // Common device policy/MDM apps
+                  return packageName.contains("devicepolicy") ||
+                         packageName.contains("mdm") ||
+                         packageName.contains("mobileiron") ||
+                         packageName.contains("airwatch") ||
+                         packageName.contains("maas360") ||
+                         packageName.contains("blackberry") ||
+                         packageName.contains("microsoft.intune") ||
+                         packageName.contains("good.gd");
+              }
+          }
+          EOF
+          
+          echo "✅ Xposed hook class created"
+
+      - name: Create xposed_init file
+        run: |
+          echo "Creating xposed_init file..."
+          
+          mkdir -p app/src/main/assets
+          echo "com.bouteillepleine.fuckdevicepolicy.DevicePolicyHook" > app/src/main/assets/xposed_init
+          
+          echo "✅ xposed_init file created"
+
       - name: Create simple launcher icons
         run: |
           echo "Creating launcher icons using ImageMagick..."
@@ -266,8 +413,35 @@ jobs:
           }
           EOF
           
+            # Create XposedHelpers stub
+            cat > temp_xposed/de/robv/android/xposed/XposedHelpers.java << 'EOF'
+          package de.robv.android.xposed;
+          
+          public class XposedHelpers {
+              public static Class<?> findClass(String className, ClassLoader classLoader) throws ClassNotFoundException {
+                  return Class.forName(className, false, classLoader);
+              }
+              
+              public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {}
+              public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {}
+          }
+          EOF
+          
+            # Create callbacks package
+            mkdir -p temp_xposed/de/robv/android/xposed/callbacks
+            cat > temp_xposed/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
+          package de.robv.android.xposed.callbacks;
+          
+          public class XC_LoadPackage {
+              public static class LoadPackageParam {
+                  public String packageName;
+                  public ClassLoader classLoader;
+              }
+          }
+          EOF
+          
             # Compile stub classes
-            javac -d temp_xposed temp_xposed/de/robv/android/xposed/*.java
+            javac -d temp_xposed temp_xposed/de/robv/android/xposed/*.java temp_xposed/de/robv/android/xposed/callbacks/*.java
             
             # Create JAR
             cd temp_xposed
@@ -396,6 +570,9 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools">
+              
+              <uses-permission android:name="android.permission.DEVICE_POWER" />
+              <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
           
               <application
                   android:allowBackup="true"
@@ -543,21 +720,28 @@ jobs:
           APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
           
           # Get current date
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%
+      
+      - name: Generate release body
+        run: |
+          VERSION_NAME="${{ github.event.inputs.version_name }}"
+          VERSION_CODE="${{ github.event.inputs.version_code }}"
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
+          
+          # Get current date
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
-
           ### 📋 Release Information
           - **Version Name:** ${VERSION_NAME}
           - **Version Code:** ${VERSION_CODE}
           - **APK Size:** ${APK_SIZE_MB} MB
           - **Build Date:** ${BUILD_DATE}
           - **Pre-release:** ${{ github.event.inputs.prerelease }}
-
           ### 📝 Release Notes
           ${RELEASE_NOTES}
-
           ### 📦 Installation
           1. Download the APK file below
           2. Enable \"Unknown Sources\" in Android settings
@@ -565,12 +749,10 @@ jobs:
           4. Ensure you have LSPosed/Xposed Framework installed
           5. Enable this module in LSPosed/Xposed
           6. Reboot your device
-
           ### ⚠️ Requirements
           - Android 5.0+ (API 21+)
           - LSPosed or Xposed Framework
           - Root access
-
           ---
           **Note:** This is an Xposed module that bypasses device policy restrictions. Use responsibly and at your own risk."
           
