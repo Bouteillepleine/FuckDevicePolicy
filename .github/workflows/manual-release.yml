@@ -36,32 +36,60 @@ jobs:
 
       - name: Create project structure
         run: |
-          mkdir -p app/src/main/{java/com/fuckdevicepolicy,assets,res/{values,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}}
+          mkdir -p app/src/main/{java/com/fuckdevicepolicy,assets,res/{values,mipmap-hdpi}}
           mkdir -p app/libs
 
       - name: Create source files
         run: |
-          # XposedHook.java (simplified)
+          # XposedHook.java
           cat > app/src/main/java/com/fuckdevicepolicy/XposedHook.java << 'EOF'
           package com.fuckdevicepolicy;
+          
           public class XposedHook {
-              // Xposed hook implementation
+              public static void log(String message) {
+                  System.out.println("FuckDevicePolicy: " + message);
+              }
           }
           EOF
           
           # MainActivity.java
           cat > app/src/main/java/com/fuckdevicepolicy/MainActivity.java << 'EOF'
           package com.fuckdevicepolicy;
+          
           import android.app.Activity;
           import android.os.Bundle;
           import android.widget.TextView;
+          import android.widget.LinearLayout;
+          import android.view.Gravity;
+          import android.graphics.Color;
+          
           public class MainActivity extends Activity {
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  TextView tv = new TextView(this);
-                  tv.setText("FuckDevicePolicy Active");
-                  setContentView(tv);
+                  
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setGravity(Gravity.CENTER);
+                  layout.setBackgroundColor(Color.BLACK);
+                  layout.setPadding(50, 50, 50, 50);
+                  
+                  TextView title = new TextView(this);
+                  title.setText("🖕 FuckDevicePolicy");
+                  title.setTextSize(24);
+                  title.setTextColor(Color.RED);
+                  title.setGravity(Gravity.CENTER);
+                  
+                  TextView status = new TextView(this);
+                  status.setText("✅ Module Ready\nVersion: ${{ github.event.inputs.version_name }}");
+                  status.setTextSize(16);
+                  status.setTextColor(Color.WHITE);
+                  status.setGravity(Gravity.CENTER);
+                  status.setPadding(0, 20, 0, 0);
+                  
+                  layout.addView(title);
+                  layout.addView(status);
+                  setContentView(layout);
               }
           }
           EOF
@@ -69,15 +97,24 @@ jobs:
           # AndroidManifest.xml
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.fuckdevicepolicy">
-              <application android:label="FuckDevicePolicy">
-                  <activity android:name=".MainActivity" android:exported="true">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="false"
+                  android:label="@string/app_name"
+                  android:theme="@android:style/Theme.Material">
+                  
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+                  
+                  <meta-data android:name="xposedmodule" android:value="true" />
+                  <meta-data android:name="xposeddescription" android:value="Device Policy Bypass" />
+                  <meta-data android:name="xposedminversion" android:value="54" />
               </application>
           </manifest>
           EOF
@@ -89,6 +126,9 @@ jobs:
               <string name="app_name">FuckDevicePolicy</string>
           </resources>
           EOF
+          
+          # xposed_init
+          echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
 
       - name: Setup Gradle
         run: |
@@ -110,14 +150,24 @@ jobs:
                   classpath 'com.android.tools.build:gradle:8.1.4'
               }
           }
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           EOF
           
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
           }
+          
           android {
+              namespace 'com.fuckdevicepolicy'
               compileSdk 34
+              
               defaultConfig {
                   applicationId "com.fuckdevicepolicy"
                   minSdk 21
@@ -125,16 +175,67 @@ jobs:
                   versionCode ${{ github.event.inputs.version_code }}
                   versionName "${{ github.event.inputs.version_name }}"
               }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
           }
           EOF
           
           cat > settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "FuckDevicePolicy"
           include ':app'
+          EOF
+          
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m
           EOF
 
       - name: Build APK
         run: |
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: |
+          cd app/build/outputs/apk/release
+          mv app-release.apk "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ github.event.inputs.version_name }}"
+          name: "FuckDevicePolicy v${{ github.event.inputs.version_name }}"
+          files: |
+            app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
