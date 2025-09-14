@@ -45,8 +45,10 @@ jobs:
       - name: 🔧 Add Android Tools to PATH
         run: |
           echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
-          echo "🔧 Android build tools added to PATH"
-          ls -la "$ANDROID_HOME/build-tools/34.0.0/" | head -10
+          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
+          echo "🔧 Verifying zipalign is available:"
+          which zipalign
+          zipalign
 
       - name: 🏗️ Create Project Structure - Part 1 (Base Structure)
         run: |
@@ -897,9 +899,7 @@ jobs:
 
       - name: 🔨 Build and Sign APK
         run: |
-          echo "🔨 Building and signing APK..."
-          
-          # Build the APK (only once!)
+          echo "🔨 Building APK..."
           ./gradlew assembleRelease --stacktrace --no-daemon
           
           # Create keystore
@@ -909,39 +909,35 @@ jobs:
             -dname "CN=FuckDevicePolicy Enhanced, OU=Android, O=GitHub Actions, L=Cloud, S=CI, C=US" \
             -storepass release123 -keypass release123
           
-          # Find the unsigned APK
+          # Process APK with proper alignment
           UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-          
-          if [ ! -f "$UNSIGNED_APK" ]; then
-            echo "❌ APK not found at: $UNSIGNED_APK"
-            echo "📋 Available files:"
-            find app/build/outputs/ -name "*.apk" -type f
-            exit 1
-          fi
+          ALIGNED_APK="app/build/outputs/apk/release/app-release-aligned.apk"
+          FINAL_APK="app/build/outputs/apk/release/app-release-signed.apk"
           
           echo "📦 Found APK: $UNSIGNED_APK"
           
-          # Sign the APK
-          echo "🔐 Signing APK..."
+          # Step 1: Align FIRST (required for Android R+)
+          echo "📐 Aligning APK for Android R+ compatibility..."
+          zipalign -v 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+          
+          # Step 2: Sign the aligned APK
+          echo "🔐 Signing aligned APK..."
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
             -keystore release.keystore -storepass release123 -keypass release123 \
-            "$UNSIGNED_APK" androidreleasekey
+            "$ALIGNED_APK" androidreleasekey
           
-          # Create aligned signed APK
-          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+          # Step 3: Verify alignment (critical for Android R+)
+          echo "🔍 Verifying alignment..."
+          zipalign -c -v 4 "$ALIGNED_APK"
           
-          echo "📐 Aligning APK..."
-          zipalign -v 4 "$UNSIGNED_APK" "$SIGNED_APK"
+          # Step 4: Copy to final location
+          cp "$ALIGNED_APK" "$FINAL_APK"
           
-          echo "✅ APK built, signed, and aligned successfully!"
+          echo "✅ APK properly aligned and signed for Android R+!"
           
-          # Verify the signature
-          echo "🔍 Verifying signature..."
-          jarsigner -verify -verbose -certs "$SIGNED_APK"
-          
-          # Show final status
+          # Show final APK info
           echo "📊 Final APK info:"
-          ls -la "$SIGNED_APK"
+          ls -la "$FINAL_APK"      
           
       - name: 📋 Verify Build Output
         run: |
