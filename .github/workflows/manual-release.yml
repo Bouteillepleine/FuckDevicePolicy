@@ -1260,11 +1260,26 @@ jobs:
           
           TAG_NAME="v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}"
           
-          # Create and push tag
-          git tag -a "$TAG_NAME" -m "🖕 FuckDevicePolicy Enhanced v${{ github.event.inputs.version_name }} for ${{ github.event.inputs.target_framework }}"
-          git push origin "$TAG_NAME"
-          
-          echo "✅ Release tag created: $TAG_NAME"
+          # Check if tag already exists and handle it
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG_NAME already exists"
+            
+            # Option 1: Delete and recreate (force update)
+            echo "🔄 Updating existing tag..."
+            git tag -d "$TAG_NAME" 2>/dev/null || true
+            git push origin ":refs/tags/$TAG_NAME" 2>/dev/null || true
+            
+            # Create new tag
+            git tag -a "$TAG_NAME" -m "🖕 FuckDevicePolicy Enhanced v${{ github.event.inputs.version_name }} for ${{ github.event.inputs.target_framework }} (Updated: $(date))"
+            git push origin "$TAG_NAME"
+            echo "✅ Release tag updated: $TAG_NAME"
+            
+          else
+            # Tag doesn't exist, create normally
+            git tag -a "$TAG_NAME" -m "🖕 FuckDevicePolicy Enhanced v${{ github.event.inputs.version_name }} for ${{ github.event.inputs.target_framework }}"
+            git push origin "$TAG_NAME"
+            echo "✅ Release tag created: $TAG_NAME"
+          fi
 
   notify-completion:
     name: 📢 Build Notification
