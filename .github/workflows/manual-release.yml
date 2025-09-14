@@ -653,7 +653,7 @@ jobs:
           }
           EOF
           
-          # Create Enhanced XposedModule.java with complete implementation
+          # Create FIXED Enhanced XposedModule.java (removed duplicate method)
           cat > app/src/main/java/com/strawing/fuckdevicepolicy/XposedModule.java << 'EOF'
           package com.strawing.fuckdevicepolicy;
           
@@ -703,10 +703,7 @@ jobs:
               
               private void hookSystemFramework(XC_LoadPackage.LoadPackageParam lpparam) {
                   try {
-                      XposedBridge.log(TAG + ": Hooking Android System Framework");
-                      
-                      // Enhanced DevicePolicyManager hooks
-                
+                      XposedBridge.log(TAG + ": Hoo
                             private void hookSystemFramework(XC_LoadPackage.LoadPackageParam lpparam) {
                   try {
                       XposedBridge.log(TAG + ": Hooking Android System Framework");
@@ -1000,6 +997,7 @@ jobs:
           retention-days: 30
 
       - name: 🚀 Create GitHub Release
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
