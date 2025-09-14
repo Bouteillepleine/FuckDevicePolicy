@@ -569,7 +569,7 @@ jobs:
           cd ..
           echo "✅ Created Xposed API stub"
 
-      - name: Setup Gradle Wrapper  
+            - name: Setup Gradle Wrapper  
         run: |
           echo "🔧 Setting up Gradle wrapper..."
           
@@ -615,12 +615,12 @@ jobs:
               if expr "$link" : '/.*' > /dev/null; then
                   PRG="$link"
               else
-                  PRG=$(dirname "$PRG")"/$link"
+                  PRG="$(dirname "$PRG")/$link"
               fi
           done
           
           SAVED="$(pwd)"
-          cd "$(dirname \"$PRG\")" >/dev/null
+          cd "$(dirname "$PRG")" >/dev/null
           APP_HOME="$(pwd -P)"
           cd "$SAVED" >/dev/null
           
@@ -646,7 +646,7 @@ jobs:
           fi
           
           # Set classpath
-          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+          CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
           
           # Execute Gradle
           exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \
