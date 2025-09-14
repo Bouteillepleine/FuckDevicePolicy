@@ -488,10 +488,77 @@ jobs:
           convert -size 96x96 xc:"#ff6b6b" -fill "#ffffff" -pointsize 36 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           convert -size 128x128 xc:"#ff6b6b" -fill "#ffffff" -pointsize 48 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
-      - name: Download and setup Xposed API
+      - name: Create minimal Xposed API stub
         run: |
-          wget -O app/libs/api-82.jar https://github.com/rovo89/XposedBridge/releases/download/v82/api-82.jar
-          echo "Downloaded Xposed API JAR"
+          mkdir -p temp_api/de/robv/android/xposed
+          mkdir -p temp_api/de/robv/android/xposed/callbacks
+          
+          # Create IXposedHookLoadPackage.java
+          cat > temp_api/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
+          package de.robv.android.xposed;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage;
+          public interface IXposedHookLoadPackage {
+              void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable;
+          }
+          EOF
+          
+          # Create XC_MethodHook.java
+          cat > temp_api/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
+          package de.robv.android.xposed;
+          public abstract class XC_MethodHook {
+              public static class MethodHookParam {
+                  public Object[] args;
+                  public Object getResult() { return null; }
+                  public void setResult(Object result) {}
+              }
+              protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
+              protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
+          }
+          EOF
+          
+          # Create XC_MethodReplacement.java  
+          cat > temp_api/de/robv/android/xposed/XC_MethodReplacement.java << 'EOF'
+          package de.robv.android.xposed;
+          public abstract class XC_MethodReplacement extends XC_MethodHook {
+              protected abstract Object replaceHookedMethod(MethodHookParam param) throws Throwable;
+          }
+          EOF
+          
+          # Create XposedBridge.java
+          cat > temp_api/de/robv/android/xposed/XposedBridge.java << 'EOF'
+          package de.robv.android.xposed;
+          public class XposedBridge {
+              public static void log(String message) {}
+          }
+          EOF
+          
+          # Create XposedHelpers.java
+          cat > temp_api/de/robv/android/xposed/XposedHelpers.java << 'EOF'
+          package de.robv.android.xposed;
+          public class XposedHelpers {
+              public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {}
+              public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {}
+          }
+          EOF
+          
+          # Create LoadPackageParam.java
+          cat > temp_api/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
+          package de.robv.android.xposed.callbacks;
+          public class XC_LoadPackage {
+              public static class LoadPackageParam {
+                  public String packageName;
+                  public ClassLoader classLoader;
+              }
+          }
+          EOF
+          
+          # Compile the stub API
+          mkdir -p app/libs
+          javac -d temp_classes temp_api/de/robv/android/xposed/*.java temp_api/de/robv/android/xposed/callbacks/*.java
+          cd temp_classes && jar cf ../app/libs/api-82.jar de/
+          cd ..
+          
+          echo "Created minimal Xposed API stub for compilation"
 
       - name: Create build.gradle
         run: |
