@@ -569,7 +569,7 @@ jobs:
           cd ..
           echo "✅ Created Xposed API stub"
 
-            - name: Setup Gradle Wrapper  
+      - name: Setup Gradle Wrapper  
         run: |
           echo "🔧 Setting up Gradle wrapper..."
           
