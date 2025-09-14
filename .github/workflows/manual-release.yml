@@ -889,37 +889,37 @@ jobs:
           ./gradlew assembleRelease --stacktrace --no-daemon
           echo "✅ Build completed successfully!"
 
-      - name: 🔐 Sign APK
+      - name: 🔨 Build and Sign APK
         run: |
-          echo "🔐 Signing APK..."
+          echo "🔨 Building and signing APK..."
+          cd app
           
-          # Create keystore for signing (using debug keystore approach)
-          keytool -genkey -v \
-            -keystore release-key.keystore \
-            -alias release \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass android \
-            -keypass android \
-            -dname "CN=FuckDevicePolicy, OU=Enhanced, O=Liberation, L=Freedom, S=Bypass, C=XX"
+          # Build the APK
+          ./gradlew assembleRelease
+          
+          # Create keystore
+          echo "🔑 Creating keystore..."
+          keytool -genkey -v -keystore ../release.keystore -alias androidreleasekey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=FuckDevicePolicy Enhanced, OU=Android, O=GitHub Actions, L=Cloud, S=CI, C=US" \
+            -storepass release123 -keypass release123
           
           # Sign the APK
-          jarsigner -verbose \
-            -sigalg SHA1withRSA \
-            -digestalg SHA1 \
-            -keystore release-key.keystore \
-            -storepass android \
-            -keypass android \
-            app/build/outputs/apk/release/app-release-unsigned.apk \
-            release
+          echo "🔐 Signing APK..."
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore ../release.keystore -storepass release123 -keypass release123 \
+            build/outputs/apk/release/app-release-unsigned.apk androidreleasekey
           
           # Align the APK
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
-            app/build/outputs/apk/release/app-release-unsigned.apk \
-            app/build/outputs/apk/release/app-release-signed.apk
+          echo "📐 Aligning APK..."
+          zipalign -v 4 build/outputs/apk/release/app-release-unsigned.apk \
+            ../FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk
           
-          echo "✅ APK signed successfully!"
+          echo "✅ APK built, signed, and aligned successfully!"
+          
+          # Verify the signature
+          echo "🔍 Verifying signature..."
+          jarsigner -verify -verbose -certs ../FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk
           
       - name: 📋 Verify Build Output
         run: |
