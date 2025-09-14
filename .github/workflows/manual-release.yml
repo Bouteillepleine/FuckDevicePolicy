@@ -562,7 +562,7 @@ jobs:
           
           echo "Created minimal Xposed API stub for compilation"
 
-      - name: Setup Gradle Wrapper
+      - name: Setup Gradle Wrapper (Fixed)
         run: |
           # Clean up any existing gradle files
           rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties
@@ -582,11 +582,11 @@ jobs:
           # Download gradle wrapper jar
           curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar
           
-          # Create proper gradlew script
-          cat > gradlew << 'EOF'
+          # Create proper gradlew script with correct syntax
+          cat > gradlew << 'GRADLEW_SCRIPT_EOF'
           #!/bin/sh
           
-          DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
+          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
           APP_NAME="Gradle"
           APP_BASE_NAME=$(basename "$0")
           
@@ -614,29 +614,50 @@ jobs:
               exit 1
           }
           
+          # OS specific support (must be 'true' or 'false').
+          cygwin=false
+          msys=false
+          darwin=false
+          nonstop=false
+          case "$(uname)" in
+            CYGWIN* )
+              cygwin=true
+              ;;
+            Darwin* )
+                            darwin=true
+              ;;
+            MSYS* | MINGW* )
+              msys=true
+              ;;
+            NONSTOP* )
+              nonstop=true
+              ;;
+          esac
+
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
           # Determine the Java command to use to start the JVM.
           if [ -n "$JAVA_HOME" ] ; then
               if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
                   # IBM's JDK on AIX uses strange locations for the executables
                   JAVACMD="$JAVA_HOME/jre/sh/java"
               else
-                  JAVACMD="$JAVA_HOME/bin/
-                        java"
+                  JAVACMD="$JAVA_HOME/bin/java"
               fi
               if [ ! -x "$JAVACMD" ] ; then
                   die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-          
+
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
               fi
           else
               JAVACMD="java"
               which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-          
+
           Please set the JAVA_HOME variable in your environment to match the
           location of your Java installation."
           fi
-          
+
           # Increase the maximum file descriptors if we can.
           if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
               MAX_FD_LIMIT=$(ulimit -H -n)
@@ -652,12 +673,12 @@ jobs:
                   warn "Could not query maximum file descriptor limit: $MAX_FD_LIMIT"
               fi
           fi
-          
+
           # For Darwin, add options to specify how the application appears in the dock
           if [ "$darwin" = "true" ]; then
               GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
           fi
-          
+
           # For Cygwin or MSYS, switch paths to Windows format before running java
           if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
               APP_HOME=$(cygpath --path --mixed "$APP_HOME")
@@ -665,16 +686,16 @@ jobs:
               
               JAVACMD=$(cygpath --unix "$JAVACMD")
           fi
-          
+
           # Collect all arguments for the java command; same as above
           set -- \
               "-Dorg.gradle.appname=$APP_BASE_NAME" \
-              -classpath "\"$CLASSPATH\"" \
+              -classpath "$CLASSPATH" \
               org.gradle.wrapper.GradleWrapperMain \
               "$@"
-          
+
           exec "$JAVACMD" "$@"
-          EOF
+          GRADLEW_SCRIPT_EOF
           
           chmod +x gradlew
           
@@ -957,4 +978,3 @@ jobs:
           echo "2. Install on device with LSPosed/Xposed" >> $GITHUB_STEP_SUMMARY
           echo "3. Enable module and reboot" >> $GITHUB_STEP_SUMMARY
           echo "4. Enjoy unrestricted device access! 🎉" >> $GITHUB_STEP_SUMMARY
-
