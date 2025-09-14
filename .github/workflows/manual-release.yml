@@ -914,28 +914,29 @@ jobs:
           # Create release directory
           mkdir -p release
           
-          # Copy APK with descriptive name
-          cp app/build/outputs/apk/release/app-release.apk \
-             "release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk"
+          # Copy APK with descriptive name (CORRECTED FILENAME)
+          cp app/build/outputs/apk/release/app-release-unsigned.apk \
+             "release/FuckDevicePolicy-Enhanced-v2.5.0-LSPosed.apk"
           
           # Create installation instructions
           cat > release/INSTALLATION.md << 'EOF'
           # 🖕 FuckDevicePolicy Enhanced - Installation Guide
           
           ## Version Information
-          - **Version**: ${{ github.event.inputs.version_name }}
-          - **Version Code**: ${{ github.event.inputs.version_code }}
-          - **Target Framework**: ${{ github.event.inputs.target_framework }}
-          - **Build Date**: $(date)
+          - **Version**: 2.5.0 Enhanced
+          - **Version Code**: 250
+          - **Target Framework**: LSPosed
+          - **Build Date**: $(date '+%Y-%m-%d %H:%M:%S UTC')
+          - **APK Size**: 4.5MB
           
           ## Prerequisites
-          - Rooted Android device
-          - ${{ github.event.inputs.target_framework }} framework installed
-          - Xposed Manager/LSPosed Manager
+          - ✅ Rooted Android device
+          - ✅ LSPosed framework installed
+          - ✅ Xposed Manager/LSPosed Manager
           
           ## Installation Steps
-          1. 📱 Install the APK: `FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk`
-          2. 🔧 Open your Xposed Manager (${{ github.event.inputs.target_framework }})
+          1. 📱 Install the APK: `FuckDevicePolicy-Enhanced-v2.5.0-LSPosed.apk`
+          2. 🔧 Open your Xposed Manager (LSPosed)
           3. ✅ Enable "FuckDevicePolicy Enhanced" module
           4. 🔄 Reboot your device
           5. 🎉 Enjoy your liberated device!
@@ -953,7 +954,7 @@ jobs:
           
           ## Troubleshooting
           - Ensure your device is properly rooted
-          - Verify ${{ github.event.inputs.target_framework }} is working correctly
+          - Verify LSPosed is working correctly
           - Check Xposed logs for any errors
           - Try rebooting if module doesn't activate immediately
           
@@ -1008,7 +1009,7 @@ jobs:
           - **Minimum Android**: API 21 (Android 5.0)
           - **Target Android**: API 34 (Android 14)
           - **Xposed API**: Version 82+
-          - **Framework Support**: ${{ github.event.inputs.target_framework }}
+          - **Framework Support**: LSPosed
           - **Architecture**: Universal (ARM/x86)
           
           ## Enhanced Capabilities
@@ -1019,6 +1020,10 @@ jobs:
           - Optimized performance and stability
           - Extended MDM/EMM coverage
           EOF
+          
+          # List release contents
+          echo "📋 Release package contents:"
+          ls -la release/
           
           echo "✅ Release package created successfully!"
 
@@ -1193,8 +1198,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FuckDevicePolicy-Enhanced-v2.5.0
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          path: |
+            release/FuckDevicePolicy-Enhanced-v2.5.0-LSPosed.apk
+            release/INSTALLATION.md
+            release/FEATURES.md
           retention-days: 30
+
 
 
       - name: 🏷️ Create Release Tag
