@@ -895,13 +895,13 @@ jobs:
           ls -la app/build/outputs/apk/release/
           
           # Get APK info
-          APK_PATH="app/build/outputs
-                    APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          APK_PATH="app/build/outputs/apk/release/app-release-unsigned.apk"
           if [ -f "$APK_PATH" ]; then
             echo "✅ APK built successfully: $APK_PATH"
-            echo "📊 APK Size: $(du -h $APK_PATH | cut -f1)"
-            echo "🏷️ Version: ${{ github.event.inputs.version_name }} (Code: ${{ github.event.inputs.version_code }})"
-            echo "🎯 Target Framework: ${{ github.event.inputs.target_framework }}"
+            echo "📊 APK Size: $(du -h "$APK_PATH" | cut -f1)"
+            echo "🏷️ Version: 2.5.0 Enhanced"
+            echo "🎯 Target Framework: LSPosed"
+            echo "📱 Architecture: Universal"
           else
             echo "❌ APK not found!"
             exit 1
@@ -1189,12 +1189,13 @@ jobs:
           echo ""
           echo "✅ Build artifacts ready for distribution!"
 
-      - name: 📤 Upload Release Artifacts
+      - name: 📤 Upload Enhanced APK
         uses: actions/upload-artifact@v4
         with:
-          name: FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}
-          path: release/
-          retention-days: 90
+          name: FuckDevicePolicy-Enhanced-v2.5.0
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          retention-days: 30
+
 
       - name: 🏷️ Create Release Tag
         run: |
