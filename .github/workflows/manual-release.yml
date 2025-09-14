@@ -542,9 +542,6 @@ jobs:
           EOF
           
           # Create XposedHelpers.java
-          cat > temp_api/de/robv/android/xposed/XposedHel
-
-                    # Create XposedHelpers.java
           cat > temp_api/de/robv/android/xposed/XposedHelpers.java << 'EOF'
           package de.robv.android.xposed;
           public class XposedHelpers {
@@ -626,7 +623,7 @@ jobs:
           
           # OS specific support (must be 'true' or 'false').
           cygwin=false
-          msys=false
+                    msys=false
           darwin=false
           nonstop=false
           case "$(uname)" in
@@ -634,7 +631,7 @@ jobs:
               cygwin=true
               ;;
             Darwin* )
-                            darwin=true
+              darwin=true
               ;;
             MSYS* | MINGW* )
               msys=true
