@@ -762,19 +762,22 @@ jobs:
           RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
           APK_SIZE_MB="${{ env.APK_SIZE_MB }}"
           
-          # Get current date
+          # Get current date - FIXED THE SYNTAX ERROR
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
+          
           ### 📋 Release Information
           - **Version Name:** ${VERSION_NAME}
           - **Version Code:** ${VERSION_CODE}
           - **APK Size:** ${APK_SIZE_MB} MB
           - **Build Date:** ${BUILD_DATE}
           - **Pre-release:** ${{ github.event.inputs.prerelease }}
+          
           ### 📝 Release Notes
           ${RELEASE_NOTES}
+          
           ### 📦 Installation
           1. Download the APK file below
           2. Enable \"Unknown Sources\" in Android settings
@@ -782,11 +785,12 @@ jobs:
           4. Ensure you have LSPosed/Xposed Framework installed
           5. Enable this module in LSPosed/Xposed
           6. Reboot your device
+          
           ### ⚠️ Requirements
           - Android 5.0+ (API 21+)
           - LSPosed or Xposed Framework
           - Root access
-          ---
+          
           **Note:** This is an Xposed module that bypasses device policy restrictions. Use responsibly and at your own risk."
           
           # Save to file and environment
