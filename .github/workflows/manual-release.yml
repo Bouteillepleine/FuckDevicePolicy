@@ -38,6 +38,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Remove duplicate launcher icons
+        run: |
+         find app/src/main/res/mipmap-* -name "ic_launcher.png" -delete
+         shell: bash
+    
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+    
+      - name: Build debug APK for testing
+        run: |
+         echo "Building debug APK for testing..."
+         ./gradlew assembleDebug --stacktrace
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
