@@ -36,6 +36,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: 🛠️ Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          
+      - name: 🔧 Add Android Tools to PATH
+        run: |
+          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          echo "🔧 Android build tools added to PATH"
+          ls -la "$ANDROID_HOME/build-tools/34.0.0/" | head -10
+
       - name: 🏗️ Create Project Structure - Part 1 (Base Structure)
         run: |
           echo "🏗️ Creating enhanced Android project structure..."
