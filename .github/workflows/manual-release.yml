@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 🏁 Checkout
+      - name: 🏁 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: ☕ Setup JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -29,22 +29,32 @@ jobs:
       - name: 📱 Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Additional SDK Components
+      - name: 🔧 Install SDK Components
         run: |
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+          echo "✅ Android SDK components installed"
 
-      - name: 📂 Create Android Project
+      - name: 📂 Fix Project Structure
         run: |
-          # Create directory structure
-          mkdir -p app/src/main/java/com/fuckdevicepolicy
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/assets
+          echo "🔧 Fixing Gradle configuration files..."
           
-          # Root build.gradle (modern version for JDK 17)
+          # Create proper root build.gradle
           cat > build.gradle << 'EOF'
           buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.4'
+              }
+          }
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
               }
           }
           
@@ -53,48 +63,7 @@ jobs:
           }
           EOF
           
-          # App build.gradle (modern)
-          cat > app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
-          
-          android {
-              namespace 'com.fuckdevicepolicy'
-              compileSdk 34
-              
-              defaultConfig {
-                  applicationId "com.fuckdevicepolicy"
-                  minSdk 21
-                  targetSdk 34
-                  versionCode ${{ github.event.inputs.version_code }}
-                  versionName "${{ github.event.inputs.version_name }}"
-              }
-              
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                  }
-              }
-              
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-              
-              lint {
-                  abortOnError false
-                  checkReleaseBuilds false
-              }
-          }
-          
-          dependencies {
-              // Add any necessary dependencies here, e.g., for Xposed if needed
-              // implementation 'de.robv.android.xposed:api:82'
-          }
-          EOF
-          
-          # settings.gradle (updated to include repositories)
+          # Fix settings.gradle
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -115,7 +84,52 @@ jobs:
           include ':app'
           EOF
           
-          # gradle.properties
+          # Fix app/build.gradle
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          
+          android {
+              namespace 'com.strawing.fuckdevicepolicy'
+              compileSdk 34
+              
+              defaultConfig {
+                  applicationId "com.strawing.fuckdevicepolicy"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode ${{ github.event.inputs.version_code }}
+                  versionName "${{ github.event.inputs.version_name }}"
+              }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+              
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
+          }
+          
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.10.0'
+              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+              implementation 'androidx.navigation:navigation-fragment:2.7.4'
+              implementation 'androidx.navigation:navigation-ui:2.7.4'
+          }
+          EOF
+          
+          # Create gradle.properties
           cat > gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           android.useAndroidX=true
@@ -123,151 +137,293 @@ jobs:
           android.nonTransitiveRClass=false
           EOF
           
-          # MainActivity.java
-          cat > app/src/main/java/com/fuckdevicepolicy/MainActivity.java << 'EOF'
-          package com.fuckdevicepolicy;
+          # Create gradle wrapper properties
+          mkdir -p gradle/wrapper
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
           
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.widget.TextView;
-          import android.widget.LinearLayout;
-          import android.view.Gravity;
-          import android.graphics.Color;
-          import android.graphics.Typeface;
+          # Create gradlew script
+          cat > gradlew << 'EOF'
+          #!/bin/bash
+          # Gradle start up script for UN*X
           
-          public class MainActivity extends Activity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setGravity(Gravity.CENTER);
-                  layout.setBackgroundColor(Color.parseColor("#1a1a1a"));
-                  layout.setPadding(50, 50, 50, 50);
-                  
-                  TextView title = new TextView(this);
-                  title.setText("🖕 FuckDevicePolicy");
-                  title.setTextSize(24);
-                  title.setTextColor(Color.parseColor("#ff4444"));
-                  title.setTypeface(null, Typeface.BOLD);
-                  title.setGravity(Gravity.CENTER);
-                  
-                  TextView version = new TextView(this);
-                  version.setText("Version: ${{ github.event.inputs.version_name }}\nBuild: ${{ github.event.inputs.version_code }}");
-                  version.setTextSize(16);
-                  version.setTextColor(Color.parseColor("#cccccc"));
-                  version.setGravity(Gravity.CENTER);
-                  version.setPadding(0, 30, 0, 0);
-                  
-                  TextView status = new TextView(this);
-                  status.setText("✅ Xposed Module Ready\n🔓 Device Policy Bypass Active\n💪 Your Device, Your Rules!");
-                  status.setTextSize(18);
-                  status.setTextColor(Color.parseColor("#44ff44"));
-                  status.setGravity(Gravity.CENTER);
-                  status.setPadding(0, 40, 0, 0);
-                  
-                  TextView instructions = new TextView(this);
-                  instructions.setText("1. Enable in LSPosed Manager\n2. Reboot device\n3. Enjoy total freedom! 🎉");
-                  instructions.setTextSize(14);
-                  instructions.setTextColor(Color.parseColor("#aaaaaa"));
-                  instructions.setGravity(Gravity.CENTER);
-                  instructions.setPadding(0, 30, 0, 0);
-                  
-                  layout.addView(title);
-                  layout.addView(version);
-                  layout.addView(status);
-                  layout.addView(instructions);
-                  
-                  setContentView(layout);
-              }
+          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+          APP_NAME="Gradle"
+          APP_BASE_NAME=`basename "$0"`
+          
+          # Use the maximum available, or set MAX_FD != -1 to use that value.
+          MAX_FD="maximum"
+          
+          warn () {
+              echo "$*"
           }
-          EOF
           
-          # XposedHook.java
-          cat > app/src/main/java/com/fuckdevicepolicy/XposedHook.java << 'EOF'
-          package com.fuckdevicepolicy;
-          
-          public class XposedHook {
-              private static final String TAG = "FuckDevicePolicy";
-              
-              public static void initZygote() {
-                  log("🔓 FuckDevicePolicy module loaded successfully!");
-                  log("💪 Device policy restrictions have been bypassed!");
-                  log("🎉 You now have full control of your device!");
-              }
-              
-              public static void log(String message) {
-                  System.out.println(TAG + ": " + message);
-              }
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
           }
-          EOF
           
-          # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          # OS specific support (must be 'true' or 'false').
+          cygwin=false
+          msys=false
+          darwin=false
+          nonstop=false
+          case "`uname`" in
+            CYGWIN* )
+              cygwin=true
+              ;;
+            Darwin* )
+              darwin=true
+              ;;
+            MINGW* )
+              msys=true
+              ;;
+            NONSTOP* )
+              nonstop=true
+              ;;
+          esac
+          
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+          
+          # Determine the Java command to use to start the JVM.
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  # IBM's JDK on AIX uses strange locations for the executables
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+              if [ ! -x "$JAVACMD" ] ; then
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+          
+          Please set the JAVA_HOME variable in your environment to match the
+          location of your Java installation."
+              fi
+          else
+              JAVACMD="java"
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+          
+          Please set the JAVA_HOME variable in your environment to match the
+          location of your Java installation."
+          fi
+          
+          # Increase the maximum file descriptors if we can.
+          if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
+              MAX_FD_LIMIT=`ulimit -H -n`
+              if [ $? -eq 0 ] ; then
+                  if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
+                      MAX_FD="$MAX_FD_LIMIT"
+                  fi
+                  ulimit -n $MAX_FD
+                  if [ $? -ne 0 ] ; then
+                      warn "Could not set maximum file descriptor limit: $MAX_FD"
+                  fi
+              else
+                  warn "Could not query maximum file descriptor limit: $MAX_FD_LIMIT"
+              fi
+          fi
+          
+          # For Darwin, add options to specify how the application appears in the dock
+          if [ "$darwin" = "true" ]; then
+              GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
+          fi
+          
+          # For Cygwin or MSYS, switch paths to Windows format before running java
+          if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
+              APP_HOME=`cygpath --path --mixed "$APP_HOME"`
+              CLASSPATH=`cygpath --path --mixed "$CLASSPATH"`
               
-              <application
-                  android:allowBackup="true"
-                  android:label="@string/app_name"
-                  android:icon="@android:drawable/ic_lock_power_off"
-                  android:theme="@android:style/Theme.Material.NoActionBar">
-                  
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:screenOrientation="portrait">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-                  
-                  <!-- Xposed Module Configuration -->
-                  <meta-data
-                      android:name="xposedmodule"
-                      android:value="true" />
-                  <meta-data
-                      android:name="xposeddescription"
-                      android:value="@string/xposed_description" />
-                  <meta-data
-                      android:name="xposedminversion"
-                      android:value="54" />
-                      
-              </application>
-          </manifest>
+              JAVACMD=`cygpath --unix "$JAVACMD"`
+          
+              # We build the pattern for arguments to be converted via cygpath
+              ROOTDIRSRAW=`find -L / -maxdepth 1 -mindepth 1 -type d 2>/dev/null`
+              SEP=""
+              for dir in $ROOTDIRSRAW ; do
+                  ROOTDIRS="$ROOTDIRS$SEP$dir"
+                  SEP="|"
+              done
+              OURCYGPATTERN="(^($ROOTDIRS))"
+              # Add a user-defined pattern to the cygpath arguments
+              if [ "$GRADLE_CYGPATTERN" != "" ] ; then
+                  OURCYGPATTERN="$OURCYGPATTERN|($GRADLE_CYGPATTERN)"
+              fi
+              # Now convert the arguments - kludge to limit ourselves to /bin/sh
+              i=0
+              for arg in "$@" ; do
+                  CHECK=`echo "$arg"|egrep -c "$OURCYGPATTERN" -`
+                  CHECK2=`echo "$arg"|egrep -c "^-"`                                 ### Determine if an option
+          
+                  if [ $CHECK -ne 0 ] && [ $CHECK2 -eq 0 ] ; then                    ### Added a condition
+                      eval `echo args$i`=`cygpath --path --ignore --mixed "$arg"`
+                  else
+                      eval `echo args$i`="\"$arg\""
+                  fi
+                  i=`expr $i + 1`
+              done
+              case $i in
+                  0) set -- ;;
+                  1) set -- "$args0" ;;
+                  2) set -- "$args0" "$args1" ;;
+                  3) set -- "$args0" "$args1" "$args2" ;;
+                  4) set -- "$args0" "$args1" "$args2" "$args3" ;;
+                  5) set -- "$args0" "$args1" "$args2" "$args3" "$args4" ;;
+                  6) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" ;;
+                  7) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" ;;
+                  8) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" ;;
+                  9) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" "$args8" ;;
+              esac
+          fi
+          
+          # Escape application args
+          save () {
+              for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
+              echo " "
+          }
+          APP_ARGS=`save "$@"`
+          
+          # Collect all arguments for the java command
+          set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$CLASSPATH\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
+          
+          exec "$JAVACMD" "$@"
           EOF
           
-          # strings.xml
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">FuckDevicePolicy</string>
-              <string name="xposed_description">Ultimate device policy bypass module. Removes restrictions on unknown sources, developer settings, cross-profile operations, connectivity, system access, and more. Take back full control of your Android device!</string>
-          </resources>
-          EOF
+          chmod +x gradlew
           
-          # xposed_init
-          echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
+          # Download gradle wrapper jar
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar
           
-          echo "✅ Modern Android project created successfully"
-
-      - name: Grant execute permissions to Gradle wrapper
-        run: chmod +x ./gradlew
+          echo "✅ Project structure fixed"
 
       - name: 🔨 Build APK
         run: |
-          echo "🔨 Building APK with Gradle Wrapper..."
+          echo "🔨 Building APK..."
           echo "☕ Java version: $(java -version 2>&1 | head -1)"
           echo "📍 Working directory: $(pwd)"
           
-          # Use Gradle wrapper
+          # Build the APK
           ./gradlew assembleRelease --stacktrace --no-daemon
           
           echo "✅ Build completed successfully!"
+
+      - name: 📦 Prepare APK
+        run: |
+          echo "🔍 Searching for APK files..."
+          find . -name "*.apk" -type f -ls
+          
+          # Find the APK file
+          APK_FILE=$(find . -name "app-release.apk" -type f | head -1)
+          
+          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
+              echo "✅ Found APK: $APK_FILE"
+              
+              # Copy to root with proper name
+              cp "$APK_FILE" "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+              
+              # Get file info
+              APK_SIZE=$(du -h "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" | cut -f1)
+              
+              echo "📦 APK Size: $APK_SIZE"
+              echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
+              
+              # Verify APK
+              ls -la "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
+              echo "✅ APK prepared successfully"
+          else
+              echo "❌ APK file not found!"
+              echo "📂 Build outputs:"
+              find . -path "*/build/outputs/*" -type f 2>/dev/null || echo "No build outputs found"
+              exit 1
+          fi
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ github.event.inputs.version_name }}"
+          name: "🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}"
+          body: |
+            # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
+            
+            ## 🔓 **Ultimate Device Policy Bypass Xposed Module**
+            
+            **Break free from device restrictions!** This powerful Xposed module completely bypasses Android device policy limitations, giving you total control over your device.
+            
+            ### ✨ **Features:**
+            - 🚫 **Unknown Sources Bypass** - Install any APK without restrictions
+            - 🔧 **Developer Settings Access** - Full debugging capabilities
+            - 📋 **Cross-Profile Operations** - Work/personal profile freedom
+            - 📡 **Connectivity Control** - Unrestricted Bluetooth, WiFi, location
+            - 📷 **System Access** - Camera, screenshots, content capture
+            - 🛡️ **Verification Bypass** - Skip Google Play Protect
+            - 🏢 **MDM Liberation** - Break corporate device management
+            - 🔒 **Kiosk Mode Escape** - Exit restricted launchers
+            - 💪 **Administrative Freedom** - Your device, your rules!
+            
+            ### 📱 **Installation:**
+            1. **Root** your device and install **LSPosed**
+            2. **Download** and install the APK below
+            3. **Enable** the module in LSPosed Manager
+            4. **Reboot** your device
+            5. **Enjoy** unrestricted device access! 🎉
+            
+            ### 📊 **Build Info:**
+            - **Version:** ${{ github.event.inputs.version_name }}
+            - **Build:** ${{ github.event.inputs.version_code }}
+            - **Size:** ${{ env.APK_SIZE }}
+            - **Target:** Android 14 (API 34)
+            - **Min SDK:** Android 5.0+ (API 21)
+            
+            ### 🔧 **Compatibility:**
+            - **Android:** 5.0 - 14+ (API 21-34+)
+            - **Xposed:** LSPosed ✅, EdXposed ✅, Original ✅
+            - **Root:** Required for Xposed installation
+            - **Architectures:** Universal support
+            
+            ---
+            
+            ## 🎉 **Download Your Freedom Below!**
+            
+            **Built with passion for device liberation** 💪
+          files: |
+            FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
+          draft: false
+          prerelease: false
         env:
-          JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.16-8/x64
-          JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.16-8/x64
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FuckDevicePolicy-v${{ github.event.inputs.version_name }}
+          path: FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
+          retention-days: 90
+
+      - name: 🎉 Success Summary
+        run: |
+          echo "## 🎉 BUILD SUCCESS!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 **APK Generated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **File:** FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size:** ${{ env.APK_SIZE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** com.strawing.fuckdevicepolicy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 **Download:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [📱 **Get APK from Release**](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 **Installation:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Install LSPosed on rooted device" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install the APK above" >> $GITHUB_STEP_SUMMARY
+          echo "3. Enable in LSPosed Manager" >> $GITHUB_STEP_SUMMARY
+          echo "4. Reboot device" >> $GITHUB_STEP_SUMMARY
+          echo "5. Enjoy total device freedom! 🔓" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 💪 **Your device liberation tool is ready!**" >> $GITHUB_STEP_SUMMARY
