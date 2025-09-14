@@ -889,23 +889,64 @@ jobs:
           ./gradlew assembleRelease --stacktrace --no-daemon
           echo "✅ Build completed successfully!"
 
+      - name: 🔐 Sign APK
+        run: |
+          echo "🔐 Signing APK..."
+          
+          # Create keystore for signing (using debug keystore approach)
+          keytool -genkey -v \
+            -keystore release-key.keystore \
+            -alias release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=FuckDevicePolicy, OU=Enhanced, O=Liberation, L=Freedom, S=Bypass, C=XX"
+          
+          # Sign the APK
+          jarsigner -verbose \
+            -sigalg SHA1withRSA \
+            -digestalg SHA1 \
+            -keystore release-key.keystore \
+            -storepass android \
+            -keypass android \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            release
+          
+          # Align the APK
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            app/build/outputs/apk/release/app-release-signed.apk
+          
+          echo "✅ APK signed successfully!"
+          
       - name: 📋 Verify Build Output
         run: |
           echo "📋 Verifying build output..."
           ls -la app/build/outputs/apk/release/
           
-          # Get APK info
-          APK_PATH="app/build/outputs/apk/release/app-release-unsigned.apk"
-          if [ -f "$APK_PATH" ]; then
-            echo "✅ APK built successfully: $APK_PATH"
-            echo "📊 APK Size: $(du -h "$APK_PATH" | cut -f1)"
-            echo "🏷️ Version: 2.5.0 Enhanced"
-            echo "🎯 Target Framework: LSPosed"
-            echo "📱 Architecture: Universal"
+          # Check both unsigned and signed APKs
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+          
+          if [ -f "$UNSIGNED_APK" ]; then
+            echo "✅ Unsigned APK: $UNSIGNED_APK"
+            echo "📊 Unsigned Size: $(du -h "$UNSIGNED_APK" | cut -f1)"
+          fi
+          
+          if [ -f "$SIGNED_APK" ]; then
+            echo "✅ Signed APK: $SIGNED_APK"
+            echo "📊 Signed Size: $(du -h "$SIGNED_APK" | cut -f1)"
+            echo "🔐 APK Status: Ready for installation"
           else
-            echo "❌ APK not found!"
+            echo "❌ Signed APK not found!"
             exit 1
           fi
+          
+          echo "🏷️ Version: ${{ github.event.inputs.version_name }} Enhanced"
+          echo "🎯 Target Framework: ${{ github.event.inputs.target_framework }}"
+          echo "📱 Architecture: Universal"
 
       - name: 📦 Create Release Package
         run: |
@@ -914,9 +955,13 @@ jobs:
           # Create release directory
           mkdir -p release
           
-          # Copy APK with descriptive name (CORRECTED FILENAME)
+          # Copy SIGNED APK with descriptive name (FIXED)
+          cp app/build/outputs/apk/release/app-release-signed.apk \
+             "release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-SIGNED.apk"
+          
+          # Also include unsigned version for advanced users
           cp app/build/outputs/apk/release/app-release-unsigned.apk \
-             "release/FuckDevicePolicy-Enhanced-v2.5.0-LSPosed.apk"
+             "release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-UNSIGNED.apk"
           
           # Create installation instructions
           cat > release/INSTALLATION.md << 'EOF'
@@ -1197,14 +1242,15 @@ jobs:
       - name: 📤 Upload Enhanced APK
         uses: actions/upload-artifact@v4
         with:
-          name: FuckDevicePolicy-Enhanced-v2.5.0
+          name: FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-SIGNED
           path: |
-            release/FuckDevicePolicy-Enhanced-v2.5.0-LSPosed.apk
+            release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-SIGNED.apk
+            release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-UNSIGNED.apk
             release/INSTALLATION.md
             release/FEATURES.md
+            release/BUILD_REPORT.md
+            release/CHANGELOG.md
           retention-days: 30
-
-
 
       - name: 🏷️ Create Release Tag
         run: |
