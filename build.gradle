@@ -1,1 +1,17 @@
+    # Root build.gradle (modern version for JDK 17)
+    cat > build.gradle << 'EOF'
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+        dependencies {
+            classpath 'com.android.tools.build:gradle:8.1.4'
+        }
+    }
+    
+    task clean(type: Delete) {
+        delete rootProject.buildDir
+    }
+    EOF
 
