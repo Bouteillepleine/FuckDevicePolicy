@@ -883,43 +883,53 @@ jobs:
           echo "✅ Fragment files fixed - data binding dependencies removed!"
 
 
-      - name: 🔨 Build Enhanced APK
-        run: |
-          echo "🔨 Building FuckDevicePolicy Enhanced APK..."
-          ./gradlew assembleRelease --stacktrace --no-daemon
-          echo "✅ Build completed successfully!"
-
-      - name: 🔨 Build and Sign APK
+            - name: 🔨 Build and Sign APK
         run: |
           echo "🔨 Building and signing APK..."
-          cd app
           
-          # Build the APK
-          ./gradlew assembleRelease
+          # Build the APK (only once!)
+          ./gradlew assembleRelease --stacktrace --no-daemon
           
           # Create keystore
           echo "🔑 Creating keystore..."
-          keytool -genkey -v -keystore ../release.keystore -alias androidreleasekey \
+          keytool -genkey -v -keystore release.keystore -alias androidreleasekey \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=FuckDevicePolicy Enhanced, OU=Android, O=GitHub Actions, L=Cloud, S=CI, C=US" \
             -storepass release123 -keypass release123
           
+          # Find the unsigned APK
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          
+          if [ ! -f "$UNSIGNED_APK" ]; then
+            echo "❌ APK not found at: $UNSIGNED_APK"
+            echo "📋 Available files:"
+            find app/build/outputs/ -name "*.apk" -type f
+            exit 1
+          fi
+          
+          echo "📦 Found APK: $UNSIGNED_APK"
+          
           # Sign the APK
           echo "🔐 Signing APK..."
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore ../release.keystore -storepass release123 -keypass release123 \
-            build/outputs/apk/release/app-release-unsigned.apk androidreleasekey
+            -keystore release.keystore -storepass release123 -keypass release123 \
+            "$UNSIGNED_APK" androidreleasekey
           
-          # Align the APK
+          # Create aligned signed APK
+          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+          
           echo "📐 Aligning APK..."
-          zipalign -v 4 build/outputs/apk/release/app-release-unsigned.apk \
-            ../FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk
+          zipalign -v 4 "$UNSIGNED_APK" "$SIGNED_APK"
           
           echo "✅ APK built, signed, and aligned successfully!"
           
           # Verify the signature
           echo "🔍 Verifying signature..."
-          jarsigner -verify -verbose -certs ../FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}.apk
+          jarsigner -verify -verbose -certs "$SIGNED_APK"
+          
+          # Show final status
+          echo "📊 Final APK info:"
+          ls -la "$SIGNED_APK"
           
       - name: 📋 Verify Build Output
         run: |
@@ -955,12 +965,23 @@ jobs:
           # Create release directory
           mkdir -p release
           
-          # Copy SIGNED APK with descriptive name (FIXED)
-          cp app/build/outputs/apk/release/app-release-signed.apk \
+          # Define APK paths
+          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          
+          # Check if files exist
+          if [ ! -f "$SIGNED_APK" ]; then
+            echo "❌ Signed APK not found at: $SIGNED_APK"
+            echo "📋 Available files:"
+            find app/build/outputs/ -name "*.apk" -type f
+            exit 1
+          fi
+          
+          # Copy APKs with descriptive names
+          cp "$SIGNED_APK" \
              "release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-SIGNED.apk"
           
-          # Also include unsigned version for advanced users
-          cp app/build/outputs/apk/release/app-release-unsigned.apk \
+          cp "$UNSIGNED_APK" \
              "release/FuckDevicePolicy-Enhanced-v${{ github.event.inputs.version_name }}-${{ github.event.inputs.target_framework }}-UNSIGNED.apk"
           
           # Create installation instructions
