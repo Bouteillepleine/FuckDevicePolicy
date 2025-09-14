@@ -35,8 +35,23 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK with license acceptance
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          cmake: 3.22.1
+          ndk: 25.2.9519653
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "Android SDK licenses accepted"
+
+      - name: Install required SDK components
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          echo "Required SDK components installed"
 
       - name: Install ImageMagick for icon creation
         run: |
@@ -465,14 +480,8 @@ jobs:
 
       - name: Create xposed_init
         run: |
-          # Create xposed_init file in assets directory (not in xposed subdirectory)
           echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
-          
-          # Verify creation
-          echo "✅ Created xposed_init file:"
-          ls -la app/src/main/assets/
-          echo "Content:"
-          cat app/src/main/assets/xposed_init
+          echo "✅ Created xposed_init file"
 
       - name: Create strings.xml
         run: |
@@ -486,23 +495,17 @@ jobs:
 
       - name: Create app icons
         run: |
-          # Create PNG launcher icons only to avoid conflicts
           convert -size 48x48 xc:"#ff6b6b" -fill "#ffffff" -pointsize 20 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-hdpi/ic_launcher.png
           convert -size 32x32 xc:"#ff6b6b" -fill "#ffffff" -pointsize 16 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-mdpi/ic_launcher.png
           convert -size 64x64 xc:"#ff6b6b" -fill "#ffffff" -pointsize 24 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xhdpi/ic_launcher.png
           convert -size 96x96 xc:"#ff6b6b" -fill "#ffffff" -pointsize 36 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           convert -size 128x128 xc:"#ff6b6b" -fill "#ffffff" -pointsize 48 -gravity center -annotate +0+0 "F" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          
-          # Verify created icons
-          echo "Created launcher icons:"
-          find app/src/main/res -name "ic_launcher.png" -type f | sort
+          echo "✅ Created launcher icons"
 
       - name: Create minimal Xposed API stub
         run: |
-          mkdir -p temp_api/de/robv/android/xposed
           mkdir -p temp_api/de/robv/android/xposed/callbacks
           
-          # Create IXposedHookLoadPackage.java
           cat > temp_api/de/robv/android/xposed/IXposedHookLoadPackage.java << 'EOF'
           package de.robv.android.xposed;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
@@ -511,7 +514,6 @@ jobs:
           }
           EOF
           
-          # Create XC_MethodHook.java
           cat > temp_api/de/robv/android/xposed/XC_MethodHook.java << 'EOF'
           package de.robv.android.xposed;
           public abstract class XC_MethodHook {
@@ -525,7 +527,6 @@ jobs:
           }
           EOF
           
-          # Create XC_MethodReplacement.java  
           cat > temp_api/de/robv/android/xposed/XC_MethodReplacement.java << 'EOF'
           package de.robv.android.xposed;
           public abstract class XC_MethodReplacement extends XC_MethodHook {
@@ -533,7 +534,6 @@ jobs:
           }
           EOF
           
-          # Create XposedBridge.java
           cat > temp_api/de/robv/android/xposed/XposedBridge.java << 'EOF'
           package de.robv.android.xposed;
           public class XposedBridge {
@@ -541,7 +541,6 @@ jobs:
           }
           EOF
           
-          # Create XposedHelpers.java
           cat > temp_api/de/robv/android/xposed/XposedHelpers.java << 'EOF'
           package de.robv.android.xposed;
           public class XposedHelpers {
@@ -550,7 +549,6 @@ jobs:
           }
           EOF
           
-          # Create LoadPackageParam.java
           cat > temp_api/de/robv/android/xposed/callbacks/XC_LoadPackage.java << 'EOF'
           package de.robv.android.xposed.callbacks;
           public class XC_LoadPackage {
@@ -561,21 +559,16 @@ jobs:
           }
           EOF
           
-          # Compile the stub API
           mkdir -p temp_classes
           javac -d temp_classes temp_api/de/robv/android/xposed/*.java temp_api/de/robv/android/xposed/callbacks/*.java
           cd temp_classes && jar cf ../app/libs/api-82.jar de/
           cd ..
-          
-          echo "Created minimal Xposed API stub for compilation"
+          echo "✅ Created Xposed API stub"
 
-      - name: Setup Gradle Wrapper (Fixed)
+      - name: Setup Gradle Wrapper
         run: |
-          # Clean up any existing gradle files
-          rm -rf .gradle gradle/ gradlew gradlew.bat
-          
-          # Create gradle wrapper properties manually to force version 8.5
           mkdir -p gradle/wrapper
+          
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
@@ -586,18 +579,13 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
           
-          # Download gradle wrapper jar
           curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar
           
-          # Create proper gradlew script with correct syntax
-          cat > gradlew << 'GRADLEW_SCRIPT_EOF'
+          cat > gradlew << 'EOF'
           #!/bin/sh
-          
           DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
           APP_NAME="Gradle"
           APP_BASE_NAME=$(basename "$0")
-          
-          # Resolve links: $0 may be a link
           PRG="$0"
           while [ -h "$PRG" ] ; do
               ls=$(ls -ld "$PRG")
@@ -613,7 +601,6 @@ jobs:
           APP_HOME="$(pwd -P)"
           cd "$SAVED" >/dev/null
           
-          # Function to die with a message
           die () {
               echo
               echo "$*"
@@ -621,9 +608,8 @@ jobs:
               exit 1
           }
           
-          # OS specific support (must be 'true' or 'false').
           cygwin=false
-                    msys=false
+          msys=false
           darwin=false
           nonstop=false
           case "$(uname)" in
@@ -640,13 +626,11 @@ jobs:
               nonstop=true
               ;;
           esac
-
+          
           CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-
-          # Determine the Java command to use to start the JVM.
-          if [ -n "$JAVA_HOME" ] ; then
+          
+                    if [ -n "$JAVA_HOME" ] ; then
               if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  # IBM's JDK on AIX uses strange locations for the executables
                   JAVACMD="$JAVA_HOME/jre/sh/java"
               else
                   JAVACMD="$JAVA_HOME/bin/java"
@@ -665,7 +649,6 @@ jobs:
           location of your Java installation."
           fi
 
-          # Increase the maximum file descriptors if we can.
           if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
               MAX_FD_LIMIT=$(ulimit -H -n)
               if [ $? -eq 0 ] ; then
@@ -681,20 +664,16 @@ jobs:
               fi
           fi
 
-          # For Darwin, add options to specify how the application appears in the dock
           if [ "$darwin" = "true" ]; then
               GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
           fi
 
-          # For Cygwin or MSYS, switch paths to Windows format before running java
           if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
               APP_HOME=$(cygpath --path --mixed "$APP_HOME")
               CLASSPATH=$(cygpath --path --mixed "$CLASSPATH")
-              
               JAVACMD=$(cygpath --unix "$JAVACMD")
           fi
 
-          # Collect all arguments for the java command; same as above
           set -- \
               "-Dorg.gradle.appname=$APP_BASE_NAME" \
               -classpath "$CLASSPATH" \
@@ -702,33 +681,26 @@ jobs:
               "$@"
 
           exec "$JAVACMD" "$@"
-          GRADLEW_SCRIPT_EOF
+          EOF
           
           chmod +x gradlew
-          
-          echo "Gradle wrapper setup completed"
+          echo "✅ Gradle wrapper setup completed"
 
       - name: Create gradle.properties
         run: |
           cat > gradle.properties << 'EOF'
-          # AndroidX properties
           android.useAndroidX=true
           android.enableJetifier=true
-          
-          # Gradle properties
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           org.gradle.parallel=true
           org.gradle.caching=true
           org.gradle.configureondemand=true
-          
-          # Android properties
           android.nonTransitiveRClass=false
           android.nonFinalResIds=false
           EOF
 
       - name: Create build.gradle files
         run: |
-          # Create root build.gradle with repositories in buildscript
           cat > build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -747,7 +719,6 @@ jobs:
           }
           EOF
           
-          # Create app/build.gradle
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
@@ -791,7 +762,6 @@ jobs:
           }
           EOF
           
-          # Create settings.gradle
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -814,23 +784,21 @@ jobs:
       - name: Create proguard-rules.pro
         run: |
           cat > app/proguard-rules.pro << 'EOF'
-          # Add project specific ProGuard rules here.
           -keep class de.robv.android.xposed.** { *; }
           -keep class com.fuckdevicepolicy.** { *; }
           -dontwarn de.robv.android.xposed.**
           EOF
 
-      - name: Set up Gradle permissions and validate
+      - name: Validate setup and test Gradle
         run: |
-          chmod +x gradlew
-          echo "Gradle wrapper permissions set"
-          
-          # Validate gradle setup
-          ls -la gradlew
+          echo "🔍 Validating project structure..."
+          ls -la
+          ls -la app/src/main/
           ls -la gradle/wrapper/
           
-          # Test gradle wrapper
+          echo "🧪 Testing Gradle wrapper..."
           ./gradlew --version
+          echo "✅ Gradle validation successful"
 
       - name: Cache Gradle packages
         uses: actions/cache@v3
@@ -844,15 +812,15 @@ jobs:
 
       - name: Build APK
         run: |
-          echo "Starting APK build..."
+          echo "🚀 Starting APK build..."
           ./gradlew clean assembleRelease --stacktrace --info
           
-          # Verify APK was created
           if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
               echo "✅ APK build successful"
               ls -la app/build/outputs/apk/release/
           else
               echo "❌ APK build failed - file not found"
+              find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
               exit 1
           fi
 
@@ -860,10 +828,9 @@ jobs:
         run: |
           cd app/build/outputs/apk/release
           mv app-release.apk "FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk"
-          echo "APK renamed successfully"
+          echo "✅ APK renamed successfully"
 
       - name: Generate release notes
-        id: release_notes
         run: |
           cat > release_notes.md << 'EOF'
           # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
@@ -941,8 +908,6 @@ jobs:
           
           **⚡ Built with GitHub Actions** | **🔧 Version ${{ github.event.inputs.version_name }}** | **📅 $(date +'%Y-%m-%d')**
           EOF
-          
-          echo "Release notes generated successfully"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -985,3 +950,4 @@ jobs:
           echo "2. Install on device with LSPosed/Xposed" >> $GITHUB_STEP_SUMMARY
           echo "3. Enable module and reboot" >> $GITHUB_STEP_SUMMARY
           echo "4. Enjoy unrestricted device access! 🎉" >> $GITHUB_STEP_SUMMARY
+
