@@ -701,11 +701,15 @@ jobs:
           
           echo "Gradle wrapper setup completed"
 
-      - name: Create build.gradle files
+      - name: Create build.gradle files (FIXED)
         run: |
-          # Create root build.gradle (remove repositories from here)
+          # Create root build.gradle with repositories in buildscript
           cat > build.gradle << 'EOF'
           buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
               ext.kotlin_version = '1.9.10'
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.2'
@@ -762,7 +766,7 @@ jobs:
           }
           EOF
           
-          # Create settings.gradle (allow project repos)
+          # Create settings.gradle (simplified - no repository restrictions)
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -772,7 +776,6 @@ jobs:
               }
           }
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories {
                   google()
                   mavenCentral()
