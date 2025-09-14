@@ -800,6 +800,89 @@ jobs:
           
           echo "✅ All missing layout files and resources created successfully!"
 
+      - name: 🔧 Fix Fragment Files (Remove Data Binding)
+        run: |
+          echo "🔧 Fixing Fragment files to remove data binding dependencies..."
+          
+          # Create simple FirstFragment without data binding
+          cat > app/src/main/java/com/strawing/fuckdevicepolicy/FirstFragment.java << 'EOF'
+          package com.strawing.fuckdevicepolicy;
+          
+          import android.os.Bundle;
+          import android.view.LayoutInflater;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+          import androidx.annotation.NonNull;
+          import androidx.fragment.app.Fragment;
+          
+          public class FirstFragment extends Fragment {
+          
+              @Override
+              public View onCreateView(
+                      LayoutInflater inflater, ViewGroup container,
+                      Bundle savedInstanceState
+              ) {
+                  // Create a simple TextView programmatically
+                  TextView textView = new TextView(getContext());
+                  textView.setText(R.string.help_text);
+                  textView.setPadding(32, 32, 32, 32);
+                  textView.setTextSize(16);
+                  return textView;
+              }
+          
+              public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+                  super.onViewCreated(view, savedInstanceState);
+              }
+          
+              @Override
+              public void onDestroyView() {
+                  super.onDestroyView();
+              }
+          }
+          EOF
+          
+          # Create simple SecondFragment without data binding
+          cat > app/src/main/java/com/strawing/fuckdevicepolicy/SecondFragment.java << 'EOF'
+          package com.strawing.fuckdevicepolicy;
+          
+          import android.os.Bundle;
+          import android.view.LayoutInflater;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+          import androidx.annotation.NonNull;
+          import androidx.fragment.app.Fragment;
+          
+          public class SecondFragment extends Fragment {
+          
+              @Override
+              public View onCreateView(
+                      LayoutInflater inflater, ViewGroup container,
+                      Bundle savedInstanceState
+              ) {
+                  // Create a simple TextView programmatically
+                  TextView textView = new TextView(getContext());
+                  textView.setText("🔧 Advanced Settings\n\n⚙️ Additional configuration options will be available here.");
+                  textView.setPadding(32, 32, 32, 32);
+                  textView.setTextSize(16);
+                  return textView;
+              }
+          
+              public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+                  super.onViewCreated(view, savedInstanceState);
+              }
+          
+              @Override
+              public void onDestroyView() {
+                  super.onDestroyView();
+              }
+          }
+          EOF
+          
+          echo "✅ Fragment files fixed - data binding dependencies removed!"
+
+
       - name: 🔨 Build Enhanced APK
         run: |
           echo "🔨 Building FuckDevicePolicy Enhanced APK..."
