@@ -629,59 +629,57 @@ jobs:
 
       - name: Setup Gradle Wrapper
         run: |
-          # Use Gradle 8.5 (more stable than 8.0)
-          gradle wrapper --gradle-version 8.5 --distribution-type bin
+          # Clean up any existing gradle files
+          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties
           
-          # Update build.gradle to fix compatibility issues
-          cat > app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.1.2'
-          }
-          
-          android {
-              namespace 'com.fuckdevicepolicy'
-              compileSdk 34
-              
-              defaultConfig {
-                  applicationId "com.fuckdevicepolicy"
-                  minSdk 21
-                  targetSdk 34
-                  versionCode System.getenv('VERSION_CODE')?.toInteger() ?: 1
-                  versionName System.getenv('VERSION_NAME') ?: '1.0.0'
-                  
-                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-              }
-              
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-              
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-              
-              packagingOptions {
-                  resources {
-                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
-                  }
-              }
-          }
-          
-          dependencies {
-              compileOnly fileTree(dir: 'libs', include: ['*.jar'])
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              
-              testImplementation 'junit:junit:4.13.2'
-              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-          }
+          # Create gradle wrapper properties manually to force version 8.5
+          mkdir -p gradle/wrapper
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
           EOF
           
-          # Also update the root build.gradle
+          # Download gradle wrapper jar and scripts
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar
+          
+          # Create gradlew script
+          cat > gradlew << 'EOF'
+          #!/bin/sh
+          
+          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+          
+          APP_NAME="Gradle"
+          APP_BASE_NAME=`basename "$0"`
+          
+          GRADLE_USER_HOME=${GRADLE_USER_HOME:-$HOME/.gradle}
+          
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+              if [ ! -x "$JAVACMD" ] ; then
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+              fi
+          else
+              JAVACMD="java"
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+          fi
+          
+          GRADLE_OPTS="$GRADLE_OPTS \"-Dorg.gradle.appname=$APP_BASE_NAME\""
+          
+          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.wrapper.properties=gradle/wrapper/gradle-wrapper.properties\"" -classpath "gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
+          
+          chmod +x gradlew
+          
+          # Update build.gradle files (clean versions)
           cat > build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -705,27 +703,63 @@ jobs:
           }
           EOF
           
-          # Update gradle.properties for compatibility
-          cat > gradle.properties << 'EOF'
-          # Project-wide Gradle settings
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          org.gradle.parallel=true
-          org.gradle.caching=true
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
           
-          # Android settings
-          android.useAndroidX=true
-          android.enableJetifier=true
-          android.nonTransitiveRClass=false
-          android.enableR8.fullMode=false
+          apply plugin: 'com.android.application'
+          
+          android {
+              namespace 'com.fuckdevicepolicy'
+              compileSdk 34
+              
+              defaultConfig {
+                  applicationId "com.fuckdevicepolicy"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode System.getenv('VERSION_CODE')?.toInteger() ?: 1
+                  versionName System.getenv('VERSION_NAME') ?: '1.0.0'
+              }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          
+          dependencies {
+              compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
           EOF
           
-          echo "Updated Gradle configuration for compatibility"
+          # Create gradle.properties
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+          
+          echo "Gradle wrapper setup complete"
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
       - name: Build APK
-        run: ./gradlew assembleRelease --stacktrace --info
+        run: |
+          # Use the wrapper to ensure we use Gradle 8.5
+          ./gradlew assembleRelease --stacktrace --info
+        env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}  
+          VERSION_NAME: ${{ env.VERSION_NAME }}
 
       - name: Verify APK exists
         run: |
