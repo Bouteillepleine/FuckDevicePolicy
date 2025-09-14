@@ -653,7 +653,7 @@ jobs:
           }
           EOF
           
-          # Create FIXED Enhanced XposedModule.java (removed duplicate method)
+          # Create FIXED Enhanced XposedModule.java (REMOVED DUPLICATE METHOD)
           cat > app/src/main/java/com/strawing/fuckdevicepolicy/XposedModule.java << 'EOF'
           package com.strawing.fuckdevicepolicy;
           
@@ -684,8 +684,8 @@ jobs:
                       case "com.android.packageinstaller":
                       case "com.google.android.packageinstaller":
                           hookPackageInstaller(lpparam);
-                          break;
-                      case "com.android.vending":
+                          break
+                                            case "com.android.vending":
                           hookPlayStore(lpparam);
                           break;
                       case "com.google.android.gms":
@@ -702,9 +702,6 @@ jobs:
               }
               
               private void hookSystemFramework(XC_LoadPackage.LoadPackageParam lpparam) {
-                  try {
-                      XposedBridge.log(TAG + ": Hoo
-                            private void hookSystemFramework(XC_LoadPackage.LoadPackageParam lpparam) {
                   try {
                       XposedBridge.log(TAG + ": Hooking Android System Framework");
                       
