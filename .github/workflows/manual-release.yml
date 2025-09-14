@@ -46,7 +46,7 @@ jobs:
       - name: Create project structure
         run: |
           mkdir -p app/src/main/java/com/fuckdevicepolicy
-          mkdir -p app/src/main/assets/xposed
+          mkdir -p app/src/main/assets
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/libs
@@ -465,7 +465,14 @@ jobs:
 
       - name: Create xposed_init
         run: |
+          # Create xposed_init file in assets directory (not in xposed subdirectory)
           echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
+          
+          # Verify creation
+          echo "✅ Created xposed_init file:"
+          ls -la app/src/main/assets/
+          echo "Content:"
+          cat app/src/main/assets/xposed_init
 
       - name: Create strings.xml
         run: |
