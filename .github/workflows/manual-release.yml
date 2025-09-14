@@ -29,7 +29,7 @@ jobs:
       - name: 📱 Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 🔧 Accept SDK Licenses & Install Components
+      - name: 🔧 Accept SDK Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
@@ -38,56 +38,7 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/fuckdevicepolicy
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/assets
-          mkdir -p gradle/wrapper
-
-      - name: 🛠️ Create Gradle Wrapper Files
-        run: |
-          # Create gradle-wrapper.properties
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-          networkTimeout=10000
-          validateDistributionUrl=true
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          
-          # Create gradlew script
-          cat > gradlew << 'EOF'
-          #!/bin/sh
-          
-          APP_HOME=$( cd "${0%/*}" && pwd )
-          APP_NAME="Gradle"
-          APP_BASE_NAME=${0##*/}
-          
-          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-          
-          if [ -n "$JAVA_HOME" ] ; then
-              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  JAVACMD="$JAVA_HOME/jre/sh/java"
-              else
-                  JAVACMD="$JAVA_HOME/bin/java"
-              fi
-              if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
-              fi
-          else
-              JAVACMD="java"
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
-          fi
-          
-          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-          
-          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-          EOF
-          
-          chmod +x gradlew
-          
-          # Download gradle-wrapper.jar using wget (more reliable than curl)
-          wget -O gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar
 
       - name: 📝 Create Build Configuration
         run: |
@@ -108,10 +59,6 @@ jobs:
                   google()
                   mavenCentral()
               }
-          }
-          
-          task clean(type: Delete) {
-              delete rootProject.buildDir
           }
           EOF
           
@@ -172,10 +119,9 @@ jobs:
           
           # gradle.properties
           cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx2048m
           android.useAndroidX=true
           android.enableJetifier=true
-          android.nonTransitiveRClass=false
           EOF
 
       - name: 📱 Create Application Files
@@ -311,14 +257,20 @@ jobs:
           # xposed_init
           echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
 
-      - name: 🔨 Setup Gradle & Build APK
+      - name: 🔨 Build APK with Gradle Action
         uses: gradle/gradle-build-action@v2
         with:
           gradle-version: 8.5
-          arguments: assembleRelease --stacktrace
+          arguments: |
+            assembleRelease
+            --stacktrace
+            --info
 
       - name: 📦 Prepare Release Files
         run: |
+          echo "🔍 Looking for APK files..."
+          find . -name "*.apk" -type f
+          
           cd app/build/outputs/apk/release
           
           if [ -f "app-release.apk" ]; then
@@ -332,7 +284,12 @@ jobs:
               echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
           else
               echo "❌ APK file not found!"
-              find . -name "*.apk" -type f
+              echo "📂 Contents of release directory:"
+              ls -la
+              echo "📂 Contents of apk directory:"
+              ls -la ../
+              echo "📂 Contents of outputs directory:"
+              ls -la ../../
               exit 1
           fi
 
@@ -345,6 +302,8 @@ jobs:
             # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
             
             ## 🔓 **Device Policy Bypass Module**
+            
+            A powerful Xposed module that bypasses Android device policy restrictions, giving you full control over your device.
             
             ### ✨ **Features:**
             - ✅ **Unknown Sources** - Install APKs from anywhere
