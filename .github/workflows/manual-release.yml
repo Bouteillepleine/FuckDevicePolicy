@@ -38,7 +38,7 @@ jobs:
         run: |
           echo "🔧 Fixing Gradle configuration files..."
           
-          # Create proper settings.gradle (repositories ONLY here)
+          # Create proper settings.gradle (for project dependencies)
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -59,9 +59,14 @@ jobs:
           include ':app'
           EOF
           
-          # Create root build.gradle (NO repositories here)
+          # Create root build.gradle (with buildscript repositories)
           cat > build.gradle << 'EOF'
           buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.1.4'
               }
