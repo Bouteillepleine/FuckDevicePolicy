@@ -535,6 +535,9 @@ jobs:
           EOF
           
           # Create XposedHelpers.java
+          cat > temp_api/de/robv/android/xposed/XposedHel
+
+                    # Create XposedHelpers.java
           cat > temp_api/de/robv/android/xposed/XposedHelpers.java << 'EOF'
           package de.robv.android.xposed;
           public class XposedHelpers {
@@ -565,7 +568,7 @@ jobs:
       - name: Setup Gradle Wrapper (Fixed)
         run: |
           # Clean up any existing gradle files
-          rm -rf .gradle gradle/ gradlew gradlew.bat gradle.properties
+          rm -rf .gradle gradle/ gradlew gradlew.bat
           
           # Create gradle wrapper properties manually to force version 8.5
           mkdir -p gradle/wrapper
@@ -701,7 +704,25 @@ jobs:
           
           echo "Gradle wrapper setup completed"
 
-      - name: Create build.gradle files (FIXED)
+      - name: Create gradle.properties
+        run: |
+          cat > gradle.properties << 'EOF'
+          # AndroidX properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          
+          # Gradle properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.configureondemand=true
+          
+          # Android properties
+          android.nonTransitiveRClass=false
+          android.nonFinalResIds=false
+          EOF
+
+      - name: Create build.gradle files
         run: |
           # Create root build.gradle with repositories in buildscript
           cat > build.gradle << 'EOF'
@@ -722,7 +743,7 @@ jobs:
           }
           EOF
           
-          # Create app/build.gradle (same as before)
+          # Create app/build.gradle
           cat > app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
@@ -766,7 +787,7 @@ jobs:
           }
           EOF
           
-          # Create settings.gradle (simplified - no repository restrictions)
+          # Create settings.gradle
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
