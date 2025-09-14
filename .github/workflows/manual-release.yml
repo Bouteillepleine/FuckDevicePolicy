@@ -38,25 +38,17 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Remove duplicate launcher icons
-        run: |
-         find app/src/main/res/mipmap-* -name "ic_launcher.png" -delete
-         shell: bash
-    
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-    
-      - name: Build debug APK for testing
-        run: |
-         echo "Building debug APK for testing..."
-         ./gradlew assembleDebug --stacktrace
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: true
+
+      - name: Remove duplicate launcher icons
+        run: |
+          find app/src/main/res/mipmap-* -name "ic_launcher.png" -delete
+        shell: bash
 
       - name: Create missing directories
         run: |
@@ -555,6 +547,32 @@ jobs:
           
           # Create release body
           RELEASE_BODY="## 🚀 FuckDevicePolicy v${VERSION_NAME}
+
+          ### 📋 Release Information
+          - **Version Name:** ${VERSION_NAME}
+          - **Version Code:** ${VERSION_CODE}
+          - **APK Size:** ${APK_SIZE_MB} MB
+          - **Build Date:** ${BUILD_DATE}
+          - **Pre-release:** ${{ github.event.inputs.prerelease }}
+
+          ### 📝 Release Notes
+          ${RELEASE_NOTES}
+
+          ### 📦 Installation
+          1. Download the APK file below
+          2. Enable \"Unknown Sources\" in Android settings
+          3. Install the APK
+          4. Ensure you have LSPosed/Xposed Framework installed
+          5. Enable this module in LSPosed/Xposed
+          6. Reboot your device
+
+          ### ⚠️ Requirements
+          - Android 5.0+ (API 21+)
+          - LSPosed or Xposed Framework
+          - Root access
+
+          ---
+          **Note:** This is an Xposed module that bypasses device policy restrictions. Use responsibly and at your own risk."
           
           # Save to file and environment
           echo "$RELEASE_BODY" > release_body.md
