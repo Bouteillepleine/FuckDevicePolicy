@@ -56,6 +56,18 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xxxhdpi
           mkdir -p app/libs
 
+      - name: Remove duplicate launcher icons
+        run: |
+          # Remove PNG versions of launcher icons to avoid conflicts with WebP versions
+          find app/src/main/res -name "ic_launcher.png" -delete
+          find app/src/main/res -name "ic_launcher_round.png" -delete
+          find app/src/main/res -name "ic_launcher_foreground.png" -delete
+          find app/src/main/res -name "ic_launcher_background.png" -delete
+          
+          # List remaining launcher icons to verify
+          echo "Remaining launcher icon files:"
+          find app/src/main/res -name "ic_launcher*" | sort
+
       - name: Create enhanced XposedHook.java
         run: |
           cat > app/src/main/java/com/fuckdevicepolicy/XposedHook.java << 'EOF'
