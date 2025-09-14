@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 🏁 Checkout Repository
+      - name: 🏁 Checkout
         uses: actions/checkout@v4
 
       - name: ☕ Setup JDK 17
@@ -29,19 +29,58 @@ jobs:
       - name: 📱 Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 🔧 Accept SDK Licenses
+      - name: 🔧 Install SDK Components
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
 
-      - name: 📂 Create Project Structure
+      - name: 📂 Create Complete Project
         run: |
+          # Create directories
           mkdir -p app/src/main/java/com/fuckdevicepolicy
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
-
-      - name: 📝 Create Build Configuration
-        run: |
+          mkdir -p gradle/wrapper
+          
+          # Create gradle wrapper properties
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+          
+          # Create gradlew script
+          cat > gradlew << 'EOF'
+          #!/bin/sh
+          
+          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+          APP_HOME=$( cd "${0%/*}" && pwd )
+          
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+          else
+              JAVACMD="java"
+          fi
+          
+          # For now, just use gradle directly
+          exec gradle "$@"
+          EOF
+          
+          chmod +x gradlew
+          
+          # Install Gradle directly
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip || curl -sL https://services.gradle.org/distributions/gradle-8.5-bin.zip -o gradle-8.5-bin.zip
+          unzip -q gradle-8.5-bin.zip
+          export PATH=$PWD/gradle-8.5/bin:$PATH
+          
           # Root build.gradle
           cat > build.gradle << 'EOF'
           buildscript {
@@ -123,9 +162,7 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
-
-      - name: 📱 Create Application Files
-        run: |
+          
           # MainActivity.java
           cat > app/src/main/java/com/fuckdevicepolicy/MainActivity.java << 'EOF'
           package com.fuckdevicepolicy;
@@ -191,17 +228,11 @@ jobs:
           cat > app/src/main/java/com/fuckdevicepolicy/XposedHook.java << 'EOF'
           package com.fuckdevicepolicy;
           
-          /**
-           * FuckDevicePolicy - Xposed Module
-           * Bypasses device policy restrictions
-           */
           public class XposedHook {
-              
               private static final String TAG = "FuckDevicePolicy";
               
               public static void initZygote() {
                   log("FuckDevicePolicy module loaded successfully!");
-                  // Hook implementations will be added here
               }
               
               public static void log(String message) {
@@ -230,16 +261,9 @@ jobs:
                       </intent-filter>
                   </activity>
                   
-                  <!-- Xposed Module Configuration -->
-                  <meta-data
-                      android:name="xposedmodule"
-                      android:value="true" />
-                  <meta-data
-                      android:name="xposeddescription"
-                      android:value="@string/xposed_description" />
-                  <meta-data
-                      android:name="xposedminversion"
-                      android:value="54" />
+                  <meta-data android:name="xposedmodule" android:value="true" />
+                  <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+                  <meta-data android:name="xposedminversion" android:value="54" />
                       
               </application>
           </manifest>
@@ -257,16 +281,14 @@ jobs:
           # xposed_init
           echo "com.fuckdevicepolicy.XposedHook" > app/src/main/assets/xposed_init
 
-      - name: 🔨 Build APK with Gradle Action
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: 8.5
-          arguments: |
-            assembleRelease
-            --stacktrace
-            --info
+      - name: 🔨 Build APK
+        run: |
+          export PATH=$PWD/gradle-8.5/bin:$PATH
+          echo "🔨 Starting Gradle build..."
+          gradle assembleRelease --stacktrace --info
+          echo "✅ Build completed!"
 
-      - name: 📦 Prepare Release Files
+      - name: 📦 Prepare APK
         run: |
           echo "🔍 Looking for APK files..."
           find . -name "*.apk" -type f
@@ -278,22 +300,17 @@ jobs:
               echo "✅ APK renamed successfully"
               ls -la *.apk
               
-              # Get APK size
               APK_SIZE=$(du -h *.apk | cut -f1)
               echo "📦 APK Size: $APK_SIZE"
               echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
           else
               echo "❌ APK file not found!"
-              echo "📂 Contents of release directory:"
+              echo "📂 Directory contents:"
               ls -la
-              echo "📂 Contents of apk directory:"
-              ls -la ../
-              echo "📂 Contents of outputs directory:"
-              ls -la ../../
               exit 1
           fi
 
-      - name: 🚀 Create GitHub Release
+      - name: 🚀 Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v${{ github.event.inputs.version_name }}"
@@ -302,8 +319,6 @@ jobs:
             # 🖕 FuckDevicePolicy v${{ github.event.inputs.version_name }}
             
             ## 🔓 **Device Policy Bypass Module**
-            
-            A powerful Xposed module that bypasses Android device policy restrictions, giving you full control over your device.
             
             ### ✨ **Features:**
             - ✅ **Unknown Sources** - Install APKs from anywhere
@@ -327,49 +342,29 @@ jobs:
             - **Target SDK:** 34 (Android 14)
             - **Min SDK:** 21 (Android 5.0)
             
-            ### 📋 **Compatibility:**
-            - **Android:** 5.0+ (API 21-34)
-            - **Xposed:** LSPosed, EdXposed, Original Xposed
-            - **Architecture:** ARM, ARM64, x86, x86_64
-            
             ### ⚠️ **Disclaimer**
             This module is for educational and testing purposes. Use responsibly and in compliance with your organization's policies.
-            
-            ---
-            **Built with ❤️ by the FuckDevicePolicy team**
           files: |
             app/build/outputs/apk/release/FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📤 Upload Build Artifacts
+      - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: FuckDevicePolicy-v${{ github.event.inputs.version_name }}
-          path: |
-            app/build/outputs/apk/release/*.apk
-          retention-days: 30
+          path: app/build/outputs/apk/release/*.apk
 
-      - name: 🎉 Build Success Summary
+      - name: 🎉 Success Summary
         run: |
-          echo "## 🎉 BUILD COMPLETED SUCCESSFULLY!" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 BUILD SUCCESSFUL!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 **Generated Files:**" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 **Generated:**" >> $GITHUB_STEP_SUMMARY
           echo "- **APK:** FuckDevicePolicy-v${{ github.event.inputs.version_name }}.apk" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Size:** ${{ env.APK_SIZE }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 **Download Links:**" >> $GITHUB_STEP_SUMMARY
-          echo "- [📱 **Download APK**](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }})" >> $GITHUB_STEP_SUMMARY
-          echo "- [📋 **View Artifacts**](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 **Download:**" >> $GITHUB_STEP_SUMMARY
+          echo "[📱 **Get APK Here**](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 **Ready to Use!**" >> $GITHUB_STEP_SUMMARY
-          echo "Your FuckDevicePolicy Xposed module is ready for installation! 🎊" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the APK from the release page" >> $GITHUB_STEP_SUMMARY
-          echo "2. Install on your device" >> $GITHUB_STEP_SUMMARY
-          echo "3. Enable in LSPosed/Xposed Manager" >> $GITHUB_STEP_SUMMARY
-          echo "4. Reboot and enjoy! 🔓" >> $GITHUB_STEP_SUMMARY
+          echo "**🚀 Your FuckDevicePolicy module is ready!**" >> $GITHUB_STEP_SUMMARY
