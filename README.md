@@ -44,6 +44,8 @@ Due to LSPosed's [New XSharedPreferences](https://github.com/LSPosed/LSPosed/wik
 
 # UI
 
-![1](https://user-images.githubusercontent.com/18359157/216805568-d95ff5ee-95bb-45a8-8f92-340f9533bd28.jpg)![Screenshot_2025-09-20-09-46-09-68_ac62f034c27d1dc3c0631c5ca527c9b4](https://github.com/user-attachments/assets/b24243f6-2730-435e-9bc2-7bcf84bfa7fd)
+![Screenshot_2025-09-20-09-46-09-68_ac62f034c27d1dc3c0631c5ca527c9b4](https://github.com/user-attachments/assets/b9f2fb35-d045-4d99-8a6f-c0c8c4793462)
+
+
 
 
