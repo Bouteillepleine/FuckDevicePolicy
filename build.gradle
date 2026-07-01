@@ -1,17 +1,6 @@
-    # Root build.gradle (modern version for JDK 17)
-    cat > build.gradle << 'EOF'
-    buildscript {
-        repositories {
-            google()
-            mavenCentral()
-        }
-        dependencies {
-            classpath 'com.android.tools.build:gradle:8.1.4'
-        }
-    }
-    
-    task clean(type: Delete) {
-        delete rootProject.buildDir
-    }
-    EOF
-
+// Top-level build file. If Android Studio prompts to upgrade AGP/Kotlin, accept
+// its suggestion — these versions are a known-good baseline (Studio Koala+).
+plugins {
+    id 'com.android.application' version '8.6.0' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default LSPosed scope suggestion. "android" = System Framework (system_server),
+         where most policy is actually enforced. Users add specific target apps in
+         the LSPosed manager. -->
+    <string-array name="xposed_scope">
+        <item>android</item>
+    </string-array>
+</resources>

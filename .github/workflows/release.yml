@@ -1,0 +1,47 @@
+name: Release
+
+# Push a tag like `v3.0` to build and publish a signed release.
+# The signing key ships in the repo (app/duckpolicy.jks) — no secrets needed.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to publish the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.1" >/dev/null
+
+      - name: Build signed release
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Stage APK
+        run: |
+          NAME="DuckPolicy-${GITHUB_REF_NAME#v}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "APK_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DuckPolicy-release
+          path: ${{ env.APK_NAME }}
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.APK_NAME }}
+          generate_release_notes: true

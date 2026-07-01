@@ -1,21 +1,8 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# Keep the Xposed entry point and hook classes intact (referenced by name via
+# assets/xposed_init and by the framework).
+-keep class com.strawing.duckdevicepolicy.MainModule { *; }
+-keepnames class com.strawing.duckdevicepolicy.** { *; }
 
-# Xposed framework
--keep class de.robv.android.xposed.** { *; }
--keep class * extends de.robv.android.xposed.IXposedHookLoadPackage
--keep class * extends de.robv.android.xposed.IXposedHookZygoteInit
--keep class * extends de.robv.android.xposed.IXposedHookInitPackageResources
-
-# Keep module entry point
--keep class com.bouteillepleine.fuckdevicepolicy.** { *; }
-
-# Basic Android rules
--keepattributes *Annotation*
--keepattributes Signature
--keepattributes InnerClasses
--keepattributes EnclosingMethod
-
-# Don't warn about missing classes
+# Xposed API is provided at runtime.
 -dontwarn de.robv.android.xposed.**
+-keep class de.robv.android.xposed.** { *; }

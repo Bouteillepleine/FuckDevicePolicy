@@ -9,7 +9,18 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+
+# never commit signing material or built binaries
+*.jks
+*.keystore
+keystore.properties
+/app/release
+*.apk
+
+# project signing key (intentionally public, non-secret)
+!/app/duckpolicy.jks
