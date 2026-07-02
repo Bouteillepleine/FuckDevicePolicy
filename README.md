@@ -36,6 +36,8 @@ toggle.
    - or specific target app(s) whose policy view you want to change.
 3. Reboot (or force-stop) the scoped processes to apply.
 
+   <img width="424" height="924" alt="uix_duckmypolicy" src="https://github.com/user-attachments/assets/c2c223e4-3e91-42a6-a740-b9ae99703760" />
+
 > [!IMPORTANT]
 > **Do not scope the MDM app itself** (e.g. Microsoft Intune / Company Portal) —
 > hooking it can expose Xposed/root to detection.
@@ -67,6 +69,8 @@ The project ships a signing key (`app/duckpolicy.jks`) that is **intentionally n
 a secret** — like an Android debug key. This lets CI and local builds produce a
 consistently-signed, installable APK with zero secret setup, and lets users update
 in place across versions. It is not a Play Store identity. Pushing a `v*` tag runs
+
+
 `.github/workflows/release.yml`, which builds and publishes the signed APK.
 
 ## Credits
