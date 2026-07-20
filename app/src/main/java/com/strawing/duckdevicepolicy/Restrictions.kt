@@ -18,6 +18,7 @@ object Restrictions {
     private const val DPM = "android.app.admin.DevicePolicyManager"
     private const val UM = "android.os.UserManager"
     private const val RM = "android.content.RestrictionsManager"
+    private const val OUTLOOK_DP = "com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy"
 
     // ---- param type names ----
     private const val CN = "android.content.ComponentName"
@@ -36,6 +37,7 @@ object Restrictions {
     const val LOCK_TASK = "lock_task"
     const val PERMITTED = "permitted"
     const val MISC = "misc"
+    const val OUTLOOK_ENROLLMENT = "outlook_enrollment"
 
     data class Category(val key: String, val title: String, val subtitle: String)
 
@@ -53,6 +55,7 @@ object Restrictions {
         Category(LOCK_TASK, "Kiosk / lock-task mode", "Report lock-task as permitted / unrestricted"),
         Category(PERMITTED, "Allowed IMEs & accessibility", "Remove input-method / accessibility allow-lists"),
         Category(MISC, "Misc (auto-time, cross-profile, BT)", "Clear assorted smaller restrictions"),
+        Category(OUTLOOK_ENROLLMENT, "Outlook enrollment gate", "Report the device as already MDM-enrolled/compliant inside Outlook"),
     )
 
     data class Spec(
@@ -126,5 +129,12 @@ object Restrictions {
         Spec(MISC, DPM, "getBluetoothContactSharingDisabled", arrayOf(CN)) { false },
         Spec(MISC, DPM, "getCrossProfileCallerIdDisabled", arrayOf(CN)) { false },
         Spec(MISC, DPM, "getCrossProfileContactsSearchDisabled", arrayOf(CN)) { false },
+
+        // Outlook's own enrollment/compliance gate (app-private class, not a
+        // framework or MAM-SDK type — only resolves when this module is scoped
+        // into com.microsoft.office.outlook; silently skipped everywhere else
+        // via the same per-spec try/catch as the DPM/UM rows above).
+        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "requiresDeviceManagement", arrayOf()) { false },
+        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "isPolicyApplied", arrayOf()) { true },
     )
 }

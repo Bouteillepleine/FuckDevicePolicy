@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.1
+- **New category: Outlook enrollment gate.** Hooks Outlook's own
+  `olmcore.managers.mdm.DevicePolicy` (`requiresDeviceManagement` → false,
+  `isPolicyApplied` → true) so the app never shows the "your organization
+  requires device management" enrollment screen. This is a different layer
+  than the DPM/UserManager rows above — it's Outlook's private compliance
+  gate, not a framework or Intune-MAM-SDK check — so it only installs when
+  the module is scoped into `com.microsoft.office.outlook`, added to the
+  default scope suggestion.
+- Note: this does not touch Intune MAM app-protection restrictions
+  (screenshot block, copy/paste, PIN) inside Outlook — those are enforced
+  independently via `com.microsoft.intune.mam` and need a separate hook.
+
 ## 3.0
 Full rewrite (Kotlin).
 

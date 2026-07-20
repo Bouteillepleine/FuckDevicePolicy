@@ -22,7 +22,10 @@ toggle.
   limits, storage-encryption enforcement, managed app configuration, **user
   restrictions (`DISALLOW_*`, incl. `UserManager.hasUserRestriction`)**,
   auto-lock timeout, kiosk / lock-task, permitted IME & accessibility allow-lists,
-  and assorted smaller restrictions.
+  assorted smaller restrictions, and **Outlook's own MDM enrollment gate**
+  (`requiresDeviceManagement` / `isPolicyApplied` — skips the "your organization
+  requires device management" screen; only installs when scoped into
+  `com.microsoft.office.outlook`).
 - **Material You** dynamic colours (Android 12+) and an adaptive icon.
 - Small: R8 + resource shrinking, ~1.8 MB.
 
@@ -39,8 +42,12 @@ toggle.
    <img width="424" height="924" alt="uix_duckmypolicy" src="https://github.com/user-attachments/assets/c2c223e4-3e91-42a6-a740-b9ae99703760" />
 
 > [!IMPORTANT]
-> **Do not scope the MDM app itself** (e.g. Microsoft Intune / Company Portal) —
-> hooking it can expose Xposed/root to detection.
+> **Do not scope the MDM app itself** (e.g. Microsoft Intune / Company Portal)
+> **or Microsoft Authenticator** — hooking those can expose Xposed/root to
+> detection (Authenticator in particular does heavy root/Play-Integrity
+> attestation). Outlook is different and included in the default scope: it has
+> no meaningful Xposed/root detection, only its own enrollment-gate check,
+> which the `outlook_enrollment` category neutralises.
 >
 > Because settings are shared cross-process via `XSharedPreferences`, the module
 > should be **enabled (and the device rebooted once)** before you rely on the
@@ -55,6 +62,13 @@ The hooks patch the **client-side** `DevicePolicyManager` / `UserManager` wrappe
 inside each scoped process, so they change what an app (or the framework) *sees*
 when it queries policy. They do **not** rewrite what `system_server` actually
 *enforces* underneath. Intended for your own device.
+
+The Outlook enrollment gate is a separate, narrower thing: it patches Outlook's
+own private `DevicePolicy` class, not a framework or MAM-SDK type. It stops the
+initial "enroll this device" prompt, but does **not** touch Intune's MAM
+app-protection layer (screenshot block, copy/paste, save-to-personal, app PIN)
+— that's enforced independently by the embedded `com.microsoft.intune.mam` SDK
+and needs its own separate hook if you want to neutralise it too.
 
 ## Build
 

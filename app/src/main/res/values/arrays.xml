@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Default LSPosed scope suggestion. "android" = System Framework (system_server),
-         where most policy is actually enforced. Users add specific target apps in
-         the LSPosed manager. -->
+         where most policy is actually enforced. Outlook is included for its own
+         enrollment-gate hooks (harmless target: no meaningful root/Xposed detection).
+         Users add/remove specific target apps in the LSPosed manager. -->
     <string-array name="xposed_scope">
         <item>android</item>
+        <item>com.microsoft.office.outlook</item>
     </string-array>
 </resources>
