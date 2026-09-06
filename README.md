@@ -31,6 +31,10 @@ toggle.
 
 ## Install & scope
 
+0. **Check your framework first.** From 4.0 this is a *modern* Xposed module
+   (libxposed, `minApiVersion=101` / `targetApiVersion=102`). It needs a framework
+   that implements API 101+ — the LSPosed 2.x forks. Mainline LSPosed 1.9.x stopped
+   at the legacy API and will not load this build; stay on 3.1 there.
 1. Install the APK from [Releases](https://github.com/Bouteillepleine/FuckDevicePolicy/releases)
    and enable **DuckPolicy** in LSPosed.
 2. Set the module **scope**:
@@ -49,9 +53,10 @@ toggle.
 > no meaningful Xposed/root detection, only its own enrollment-gate check,
 > which the `outlook_enrollment` category neutralises.
 >
-> Because settings are shared cross-process via `XSharedPreferences`, the module
-> should be **enabled (and the device rebooted once)** before you rely on the
-> toggles — otherwise a freshly-installed, not-yet-hooked app can't read them.
+> Settings are no longer a world-readable file: the framework brokers them
+> (`getRemotePreferences`), so a toggle takes effect in every already-hooked
+> process immediately, with no reboot. A reboot (or force-stop) is still needed
+> after a **scope** change, because that is when hooks are installed.
 
 To see which restrictions are actually applied on your device:
 `adb shell dumpsys device_policy` (look under `userRestrictions:`).
@@ -59,7 +64,8 @@ To see which restrictions are actually applied on your device:
 ## How it works (and its limits)
 
 The hooks patch the **client-side** `DevicePolicyManager` / `UserManager` wrappers
-inside each scoped process, so they change what an app (or the framework) *sees*
+inside each scoped process (installed from `onSystemServerStarting` for System
+Framework and `onPackageReady` for apps), so they change what an app (or the framework) *sees*
 when it queries policy. They do **not** rewrite what `system_server` actually
 *enforces* underneath. Intended for your own device.
 
@@ -76,7 +82,17 @@ and needs its own separate hook if you want to neutralise it too.
 ./gradlew :app:assembleDebug      # debug
 ./gradlew :app:assembleRelease    # signed release (R8 + shrink)
 ```
-Requires JDK 17. The Xposed API is pulled `compileOnly` from `api.xposed.info`.
+Requires JDK 17, `compileSdk 36` and `build-tools 36.0.0`. The modern Xposed API
+(`io.github.libxposed:api`) comes `compileOnly` from Maven Central — it must never be
+bundled, the framework rejects a module that ships its own copy of the API classes.
+The app half additionally links `io.github.libxposed:service`, which is what lets the
+UI share preferences with the hook and read its own scope.
+
+The artifacts are pinned to 101.x while `module.prop` declares `targetApiVersion=102`:
+the 102.x artifacts require `compileSdk 37`, hence AGP 9. The only difference in the
+102 API jar is the hot-reload callbacks (defaulted on the interface) and the `API_102`
+constant, and `targetApiVersion` is a promise not to call the legacy API — which this
+module does not.
 
 ### Release signing
 The project ships a signing key (`app/duckpolicy.jks`) that is **intentionally not

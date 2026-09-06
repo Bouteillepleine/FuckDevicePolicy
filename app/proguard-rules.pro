@@ -1,8 +1,11 @@
-# Keep the Xposed entry point and hook classes intact (referenced by name via
-# assets/xposed_init and by the framework).
--keep class com.strawing.duckdevicepolicy.MainModule { *; }
--keepnames class com.strawing.duckdevicepolicy.** { *; }
+# Rules published by libxposed for modules (see io.github.libxposed:api README).
+# -adaptresourcefilecontents rewrites META-INF/xposed/java_init.list when R8 renames the
+# entry class, which is what makes obfuscation safe here: the file and the dex stay in sync.
+-dontwarn io.github.libxposed.annotation.**
+-adaptresourcefilecontents META-INF/xposed/java_init.list
+-keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
+    public <init>();
+}
 
-# Xposed API is provided at runtime.
--dontwarn de.robv.android.xposed.**
--keep class de.robv.android.xposed.** { *; }
+# The API is compileOnly — provided by the framework at runtime, absent from the APK.
+-dontwarn io.github.libxposed.api.**

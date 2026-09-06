@@ -19,6 +19,7 @@ object Restrictions {
     private const val UM = "android.os.UserManager"
     private const val RM = "android.content.RestrictionsManager"
     private const val OUTLOOK_DP = "com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy"
+    private const val OUTLOOK_PKG = "com.microsoft.office.outlook"
 
     // ---- param type names ----
     private const val CN = "android.content.ComponentName"
@@ -63,6 +64,13 @@ object Restrictions {
         val className: String,
         val method: String,
         val paramTypes: Array<String>,
+        /**
+         * Package whose own private class this row names, or null for a framework class every
+         * process shares. The modern API hands the hook a separate entry point per process, so
+         * app-private rows are installed only where their class is loadable instead of being
+         * attempted (and silently failing) everywhere.
+         */
+        val pkg: String? = null,
         val result: () -> Any?,
     )
 
@@ -131,10 +139,9 @@ object Restrictions {
         Spec(MISC, DPM, "getCrossProfileContactsSearchDisabled", arrayOf(CN)) { false },
 
         // Outlook's own enrollment/compliance gate (app-private class, not a
-        // framework or MAM-SDK type — only resolves when this module is scoped
-        // into com.microsoft.office.outlook; silently skipped everywhere else
-        // via the same per-spec try/catch as the DPM/UM rows above).
-        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "requiresDeviceManagement", arrayOf()) { false },
-        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "isPolicyApplied", arrayOf()) { true },
+        // framework or MAM-SDK type). Tagged with its package so it is installed
+        // from onPackageReady in Outlook's process only.
+        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "requiresDeviceManagement", arrayOf(), OUTLOOK_PKG) { false },
+        Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "isPolicyApplied", arrayOf(), OUTLOOK_PKG) { true },
     )
 }

@@ -16,6 +16,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.google.android.material.materialswitch.MaterialSwitch
+import io.github.libxposed.service.XposedService
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,7 +24,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var masterSwitch: MaterialSwitch
     private lateinit var statusText: TextView
     private lateinit var categoryContainer: LinearLayout
+    private lateinit var scopeHint: TextView
     private val categorySwitches = LinkedHashMap<String, MaterialSwitch>()
+
+    /** True when [prefs] is the framework's remote store rather than the local fallback. */
+    private var usingRemotePrefs = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,14 +36,15 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         applyInsets()
 
-        prefs = openPrefs()
+        prefs = resolvePrefs()
         masterSwitch = findViewById(R.id.masterSwitch)
         statusText = findViewById(R.id.statusText)
         categoryContainer = findViewById(R.id.categoryContainer)
+        scopeHint = findViewById(R.id.scopeHint)
 
         masterSwitch.isChecked = prefs.getBoolean(Prefs.KEY_MASTER, true)
         masterSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(Prefs.KEY_MASTER, checked).apply()
+            prefs.edit()?.putBoolean(Prefs.KEY_MASTER, checked)?.apply()
             updateStatus(checked)
             setCategoriesEnabled(checked)
         }
@@ -49,6 +55,90 @@ class MainActivity : AppCompatActivity() {
 
         updateStatus(masterSwitch.isChecked)
         setCategoriesEnabled(masterSwitch.isChecked)
+        updateScopeHint()
+    }
+
+    // ------------------------------------------------------- framework service (libxposed)
+
+    /**
+     * The framework binder arrives asynchronously and may land after this activity is built,
+     * which would leave the UI editing the local fallback file while the hook reads the remote
+     * store. Rebuild once when it shows up (or goes away).
+     */
+    private val serviceListener: (XposedService?) -> Unit = { svc ->
+        runOnUiThread {
+            if ((svc != null) != usingRemotePrefs && !isFinishing) recreate()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        App.addListener(serviceListener)
+    }
+
+    override fun onStop() {
+        App.removeListener(serviceListener)
+        super.onStop()
+    }
+
+    /**
+     * Settings live in the framework's remote preferences, which is how the hook reads them
+     * from inside system_server and every scoped app. This replaces the old
+     * MODE_WORLD_READABLE file that XSharedPreferences used to redirect: a modern module gets
+     * no such redirect, so that file would be written and never read. Falling back to a local
+     * file keeps the screen usable when the framework is absent — nothing is hooked in that
+     * state anyway, so the values would have no effect either way.
+     */
+    private fun resolvePrefs(): SharedPreferences {
+        App.service?.let { svc ->
+            runCatching { svc.getRemotePreferences(Prefs.NAME) }.getOrNull()?.let { remote ->
+                usingRemotePrefs = true
+                importLegacyPrefs(remote)
+                return remote
+            }
+        }
+        usingRemotePrefs = false
+        return getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+    }
+
+    /**
+     * Carry 3.x settings across once. Those lived in a MODE_WORLD_READABLE file that the old
+     * framework redirected out of the app's data dir, so the read may legitimately find nothing
+     * and the user simply starts from defaults. Best effort by design — never let a failed
+     * import block the UI.
+     */
+    private fun importLegacyPrefs(remote: SharedPreferences) {
+        if (remote.getBoolean(Prefs.KEY_IMPORTED, false)) return
+        @Suppress("DEPRECATION")
+        val legacy = runCatching {
+            getSharedPreferences(Prefs.NAME, Context.MODE_WORLD_READABLE)
+        }.getOrElse {
+            runCatching { getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE) }.getOrNull()
+        }
+        val edit = remote.edit() ?: return
+        legacy?.let {
+            for (key in Prefs.allKeys()) {
+                if (it.contains(key)) edit.putBoolean(key, it.getBoolean(key, true))
+            }
+        }
+        edit.putBoolean(Prefs.KEY_IMPORTED, true).apply()
+    }
+
+    /**
+     * DuckPolicy's own LSPosed scope, straight from the framework. The legacy API could not
+     * read this at all, so the hint below could only ever be generic advice.
+     */
+    private val moduleScope: List<String>? by lazy {
+        runCatching { App.service?.scope }.getOrNull()
+    }
+
+    private fun updateScopeHint() {
+        val scope = moduleScope
+        scopeHint.text = when {
+            !usingRemotePrefs -> getString(R.string.hint_no_framework)
+            scope.isNullOrEmpty() -> getString(R.string.hint_empty_scope)
+            else -> getString(R.string.hint_scope, scope.joinToString(", "))
+        }
     }
 
     /** Edge-to-edge: pad the content past the status/navigation bars. */
@@ -61,18 +151,6 @@ class MainActivity : AppCompatActivity() {
             v.updatePadding(top = baseTop + bars.top, bottom = baseBottom + bars.bottom)
             insets
         }
-    }
-
-    /**
-     * World-readable so the hook (in other processes) can read it via
-     * XSharedPreferences. LSPosed permits this for enabled modules; the fallback
-     * keeps the UI usable before the module is enabled.
-     */
-    private fun openPrefs(): SharedPreferences = try {
-        @Suppress("DEPRECATION")
-        getSharedPreferences(Prefs.NAME, Context.MODE_WORLD_READABLE)
-    } catch (e: SecurityException) {
-        getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
     }
 
     private fun buildCategoryToggles() {
@@ -118,7 +196,7 @@ class MainActivity : AppCompatActivity() {
                     if (!masterSwitch.isChecked) return@setOnClickListener
                     val nv = !sw.isChecked
                     sw.isChecked = nv
-                    prefs.edit().putBoolean(Prefs.key(cat.key), nv).apply()
+                    prefs.edit()?.putBoolean(Prefs.key(cat.key), nv)?.apply()
                 }
             }
             row.addView(texts)
@@ -129,7 +207,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setAllCategories(value: Boolean) {
         if (!masterSwitch.isChecked) return
-        val e = prefs.edit()
+        val e = prefs.edit() ?: return
         for ((key, sw) in categorySwitches) {
             sw.isChecked = value
             e.putBoolean(Prefs.key(key), value)

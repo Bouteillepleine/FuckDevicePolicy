@@ -5,15 +5,17 @@ plugins {
 
 android {
     namespace 'com.strawing.duckdevicepolicy'
-    compileSdk 35
-    buildToolsVersion "35.0.1"
+    // 36 is not a preference: the libxposed `service` AAR is built against it.
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.strawing.duckdevicepolicy"
-        minSdk 21
+        // Was 21. libxposed (api and service) declares minSdk 26, and no framework that
+        // implements the modern API runs on anything older anyway.
+        minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName "3.1"
+        versionCode 5
+        versionName "4.0"
     }
 
     // Project signing key ships in the repo (app/duckpolicy.jks). It is
@@ -43,14 +45,40 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = '17' }
 
     buildFeatures { buildConfig true }
+
+    // The framework reads the module's entry points out of META-INF/xposed/. AGP would
+    // otherwise drop or pick one of the duplicate META-INF paths; merging keeps all three
+    // (module.prop, java_init.list, scope.list) verbatim in the APK.
+    packaging {
+        resources { merges += "META-INF/xposed/*" }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 dependencies {
-    // Provided by the LSPosed framework at runtime.
-    compileOnly 'de.robv.android.xposed:api:82'
+    // Modern Xposed (libxposed) API. The legacy de.robv.android.xposed:api:82 is gone: an APK
+    // is either legacy or modern, never both, because the framework picks the entry point from
+    // what the APK declares (assets/xposed_init vs META-INF/xposed/java_init.list). Must stay
+    // compileOnly — a module that bundles the API classes is rejected by the framework.
+    //
+    // Pinned to 101.x on purpose. The 102.x artifacts pull io.github.libxposed:interface:102,
+    // whose AAR metadata demands compileSdk 37, and compileSdk 37 needs AGP 9 — a far bigger
+    // move than this migration. It costs nothing: the only difference between the 101 and 102
+    // API jars is the pair of hot-reload callbacks (defaulted on the interface, so a framework
+    // running API 102 supplies them anyway) and the API_102 constant. module.prop still
+    // declares targetApiVersion=102, which is a promise not to call the legacy API rather than
+    // a claim about which jar this was compiled against, and this module calls none.
+    compileOnly 'io.github.libxposed:api:101.0.1'
+    // App-side counterpart: binds the framework service so the UI can share preferences with
+    // the hook (replacing the world-readable XSharedPreferences file) and read its own scope.
+    implementation 'io.github.libxposed:service:101.0.0'
 
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'

@@ -9,9 +9,9 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        // libxposed (modern Xposed API) is published to Maven Central; the old
+        // api.xposed.info repo hosted the legacy de.robv API and is no longer needed.
         mavenCentral()
-        // Xposed API (compileOnly)
-        maven { url = uri("https://api.xposed.info/") }
     }
 }
 rootProject.name = "DuckPolicy"

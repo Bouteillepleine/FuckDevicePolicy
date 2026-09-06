@@ -190,11 +190,12 @@
                 app:tint="?android:attr/textColorSecondary" />
 
             <TextView
+                android:id="@+id/scopeHint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:lineSpacingMultiplier="1.15"
-                android:text="@string/scope_hint"
+                android:text="@string/hint_no_framework"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12.5sp" />
         </LinearLayout>
