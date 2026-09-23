@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.1
+- **Sideloading works again.** Two new categories hook
+  `com.android.server.pm.UserManagerService` inside system_server — the place the
+  restriction is actually enforced — rather than only the `android.os.UserManager`
+  wrapper each scoped process holds:
+  - **App install / uninstall block** — `no_install_unknown_sources`,
+    `no_install_unknown_sources_globally`, `no_install_apps`, `no_uninstall_apps`.
+    Installing an APK from a normal app (Telegram, a browser, a file manager) is no
+    longer refused by the package installer.
+  - **Developer options & USB debugging block** — `no_debugging_features`.
+- Hooked there: `hasUserRestriction`, `hasUserRestrictionOnAnyUser`,
+  `getUserRestrictionSource`, `getUserRestrictionSources`, plus
+  `UserManagerService$LocalService.getUserRestriction`. This is the surface the
+  upstream module patches, and it answers for **every** caller on the device, not just
+  scoped processes — so unlike the existing *User restrictions* category these rows are
+  filtered to the restriction keys their category names, instead of flattening every
+  `DISALLOW_*` the system asks about.
+- Both default on, like every other category. System Framework (`android`) scope is
+  required for them — they do nothing from an app's scope.
+
 ## 4.0
 Migrated to the **modern Xposed API (libxposed)**. The APK is now a modern module,
 not a legacy one — the two packagings are mutually exclusive, because the framework

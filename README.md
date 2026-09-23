@@ -21,6 +21,8 @@ toggle.
   managed-profile checks, the full password/PIN policy set, keyguard feature
   limits, storage-encryption enforcement, managed app configuration, **user
   restrictions (`DISALLOW_*`, incl. `UserManager.hasUserRestriction`)**,
+  **the install / uninstall block** (sideload APKs from Telegram, a browser or a
+  file manager again) and **the developer-options / USB-debugging block**,
   auto-lock timeout, kiosk / lock-task, permitted IME & accessibility allow-lists,
   assorted smaller restrictions, and **Outlook's own MDM enrollment gate**
   (`requiresDeviceManagement` / `isPolicyApplied` — skips the "your organization
@@ -63,11 +65,25 @@ To see which restrictions are actually applied on your device:
 
 ## How it works (and its limits)
 
-The hooks patch the **client-side** `DevicePolicyManager` / `UserManager` wrappers
+Most hooks patch the **client-side** `DevicePolicyManager` / `UserManager` wrappers
 inside each scoped process (installed from `onSystemServerStarting` for System
 Framework and `onPackageReady` for apps), so they change what an app (or the framework) *sees*
-when it queries policy. They do **not** rewrite what `system_server` actually
-*enforces* underneath. Intended for your own device.
+when it queries policy. Intended for your own device.
+
+Two categories go deeper, because a client-side wrapper is not where the answer is
+decided. `android.os.UserManager` only binder-calls `UserManagerService`, and the
+code that refuses an install — in `system_server` and in the package-installer UI —
+asks the service directly, never the wrapper this module patched. So the **App
+install / uninstall block** and **Developer options & USB debugging block**
+categories hook `com.android.server.pm.UserManagerService` itself
+(`hasUserRestriction`, `hasUserRestrictionOnAnyUser`, `getUserRestrictionSource`,
+`getUserRestrictionSources`, `$LocalService.getUserRestriction`), which is what the
+upstream module does. That answers for **every** process on the device, so unlike
+*User restrictions* these two are filtered to the `DISALLOW_*` keys they are about
+(`no_install_unknown_sources`, `no_install_unknown_sources_globally`,
+`no_install_apps`, `no_uninstall_apps`, `no_debugging_features`) rather than
+flattening every restriction the system asks about. They need **System Framework**
+(`android`) scope; from an app's scope they do nothing.
 
 The Outlook enrollment gate is a separate, narrower thing: it patches Outlook's
 own private `DevicePolicy` class, not a framework or MAM-SDK type. It stops the

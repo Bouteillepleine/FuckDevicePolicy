@@ -18,12 +18,15 @@ object Restrictions {
     private const val DPM = "android.app.admin.DevicePolicyManager"
     private const val UM = "android.os.UserManager"
     private const val RM = "android.content.RestrictionsManager"
+    private const val UMS = "com.android.server.pm.UserManagerService"
+    private const val UMS_LOCAL = "com.android.server.pm.UserManagerService\$LocalService"
     private const val OUTLOOK_DP = "com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy"
     private const val OUTLOOK_PKG = "com.microsoft.office.outlook"
 
     // ---- param type names ----
     private const val CN = "android.content.ComponentName"
     private const val STR = "java.lang.String"
+    private const val INT = "int"
 
     // ---- categories (keys used for prefs + UI) ----
     const val CAMERA = "camera"
@@ -34,6 +37,8 @@ object Restrictions {
     const val ENCRYPTION = "encryption"
     const val APP_RESTRICTIONS = "app_restrictions"
     const val USER_RESTRICTIONS = "user_restrictions"
+    const val PACKAGE_INSTALL = "package_install"
+    const val DEBUGGING = "debugging"
     const val MAX_LOCK = "max_lock"
     const val LOCK_TASK = "lock_task"
     const val PERMITTED = "permitted"
@@ -52,6 +57,8 @@ object Restrictions {
         Category(ENCRYPTION, "Storage-encryption enforcement", "Report encryption as not required"),
         Category(APP_RESTRICTIONS, "Managed app configuration", "Return empty app-restriction bundles"),
         Category(USER_RESTRICTIONS, "User restrictions (DISALLOW_*)", "Clear user restrictions incl. UserManager checks"),
+        Category(PACKAGE_INSTALL, "App install / uninstall block", "Sideload APKs from any app (Telegram, browsers, file managers) and uninstall admin-locked apps"),
+        Category(DEBUGGING, "Developer options & USB debugging block", "Re-enable developer settings and ADB"),
         Category(MAX_LOCK, "Auto-lock timeout", "Remove the forced maximum time-to-lock"),
         Category(LOCK_TASK, "Kiosk / lock-task mode", "Report lock-task as permitted / unrestricted"),
         Category(PERMITTED, "Allowed IMEs & accessibility", "Remove input-method / accessibility allow-lists"),
@@ -71,10 +78,29 @@ object Restrictions {
          * attempted (and silently failing) everywhere.
          */
         val pkg: String? = null,
+        val keys: Set<String>? = null,
+        val keyArg: Int = 0,
         val result: () -> Any?,
     )
 
     private fun bundle(): Any = Bundle()
+
+    private val INSTALL_KEYS = setOf(
+        "no_install_unknown_sources",
+        "no_install_unknown_sources_globally",
+        "no_install_apps",
+        "no_uninstall_apps",
+    )
+
+    private val DEBUGGING_KEYS = setOf("no_debugging_features")
+
+    private fun serviceRows(category: String, keys: Set<String>): List<Spec> = listOf(
+        Spec(category, UMS, "hasUserRestriction", arrayOf(STR, INT), keys = keys) { false },
+        Spec(category, UMS, "hasUserRestrictionOnAnyUser", arrayOf(STR), keys = keys) { false },
+        Spec(category, UMS, "getUserRestrictionSource", arrayOf(STR, INT), keys = keys) { 0 },
+        Spec(category, UMS, "getUserRestrictionSources", arrayOf(STR, INT), keys = keys) { emptyList<Any>() },
+        Spec(category, UMS_LOCAL, "getUserRestriction", arrayOf(INT, STR), keys = keys, keyArg = 1) { false },
+    )
 
     val ALL: List<Spec> = listOf(
         // camera
@@ -143,5 +169,5 @@ object Restrictions {
         // from onPackageReady in Outlook's process only.
         Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "requiresDeviceManagement", arrayOf(), OUTLOOK_PKG) { false },
         Spec(OUTLOOK_ENROLLMENT, OUTLOOK_DP, "isPolicyApplied", arrayOf(), OUTLOOK_PKG) { true },
-    )
+    ) + serviceRows(PACKAGE_INSTALL, INSTALL_KEYS) + serviceRows(DEBUGGING, DEBUGGING_KEYS)
 }

@@ -96,7 +96,7 @@ class MainModule : XposedModule() {
             try {
                 val clazz = Class.forName(spec.className, false, classLoader)
                 val params = Array<Class<*>>(spec.paramTypes.size) {
-                    Class.forName(spec.paramTypes[it], false, classLoader)
+                    paramClass(spec.paramTypes[it], classLoader)
                 }
                 val method = findMethod(clazz, spec.method, params) ?: continue
                 hook(method).intercept(hookerFor(spec))
@@ -113,6 +113,13 @@ class MainModule : XposedModule() {
         } else if (BuildConfig.DEBUG) {
             log(Log.INFO, TAG, "installed $installed/${specs.size} hooks in $where")
         }
+    }
+
+    private fun paramClass(name: String, classLoader: ClassLoader): Class<*> = when (name) {
+        "int" -> Integer.TYPE
+        "long" -> java.lang.Long.TYPE
+        "boolean" -> java.lang.Boolean.TYPE
+        else -> Class.forName(name, false, classLoader)
     }
 
     /**
@@ -136,7 +143,13 @@ class MainModule : XposedModule() {
      * [XposedInterface.Chain.proceed] is what `param.result = …` in `beforeHookedMethod` meant.
      */
     private fun hookerFor(spec: Restrictions.Spec) = XposedInterface.Hooker { chain ->
-        if (bypass(spec.category)) spec.result() else chain.proceed()
+        if (bypass(spec.category) && appliesTo(spec, chain)) spec.result() else chain.proceed()
+    }
+
+    private fun appliesTo(spec: Restrictions.Spec, chain: XposedInterface.Chain): Boolean {
+        val keys = spec.keys ?: return true
+        val arg = runCatching { chain.getArg(spec.keyArg) }.getOrNull()
+        return arg is String && arg in keys
     }
 
     private companion object {
